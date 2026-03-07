@@ -1,0 +1,136 @@
+:root {
+    --primary: #4f46e5;
+    --secondary: #10b981;
+    --danger: #ef4444;
+    --warning: #fbbf24;
+    --bg: #f3f4f6;
+    --card: #ffffff;
+    --text: #1f2937;
+    --border: #e5e7eb;
+}
+
+body {
+    font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    background-color: var(--bg);
+    color: var(--text);
+    margin: 0;
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+    padding-top: 50px;
+    min-height: 100vh;
+}
+
+.container {
+    width: 600px; 
+    background: var(--card);
+    padding: 40px;
+    border-radius: 12px;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+}
+
+header {
+    text-align: center;
+    margin-bottom: 30px;
+}
+
+header h1 {
+    margin: 0;
+    font-size: 2.5rem;
+    color: var(--primary);
+    letter-spacing: -1px;
+}
+
+header p {
+    color: #6b7280;
+    margin-top: 5px;
+}
+
+.summary-card {
+    background: var(--primary);
+    color: white;
+    padding: 20px;
+    border-radius: 10px;
+    text-align: center;
+    margin-bottom: 30px;
+}
+
+.summary-card h2 {
+    margin: 0;
+    font-weight: 500;
+}
+
+.form-section form {
+    display: grid;
+    grid-template-columns: 1fr 120px 120px;
+    gap: 15px;
+    margin-bottom: 30px;
+}
+
+input {
+    padding: 12px 15px;
+    border: 2px solid var(--border);
+    border-radius: 8px;
+    font-size: 1rem;
+    outline: none;
+    transition: border-color 0.2s;
+}
+
+input:focus {
+    border-color: var(--primary);
+}
+
+button {
+    cursor: pointer;
+    border: none;
+    border-radius: 8px;
+    font-weight: 600;
+    font-size: 0.9rem;
+    transition: transform 0.1s, opacity 0.2s;
+}
+
+button:active {
+    transform: scale(0.98);
+}
+
+#add-btn {
+    background-color: var(--secondary);
+    color: white;
+}
+
+/* List Styling */
+.item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 15px;
+    background: #f9fafb;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    margin-bottom: 10px;
+}
+
+.item-info {
+    font-size: 1.1rem;
+}
+
+.item-info strong {
+    color: var(--primary);
+}
+
+.actions {
+    display: flex;
+    gap: 8px;
+}
+
+.edit-btn {
+    background: var(--warning);
+    color: white;
+    padding: 8px 15px;
+}
+
+.delete-btn {
+    background: var(--danger);
+    color: white;
+    padding: 8px 15px;
+}
