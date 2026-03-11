@@ -7,8 +7,7 @@
 <body>
     <div class="container">
         <header>
-            <h1>Calorie Tracker</h1>
-            <p>Take control of your diet</p>
+            <h1>Calorie Tracker</h1>            
         </header>
         <div class="summery-card">
             <h2>Total Calories: <span id="total-calories">0</span> kcal</h2>            
