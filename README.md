@@ -33,3 +33,5 @@
 - Functional and resizable
 
 ## JavaScript
+- Using FastAPI
+- Using Fetch
