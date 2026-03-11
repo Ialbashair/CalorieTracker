@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Calorie Tracker</title>
+    <link rel="icon" type="image/x-icon" href="/static/favicon.ico">
+    <link rel="stylesheet" href="/static/style.css">
+    <script src="/static/script.js"></script>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Calorie Tracker</h1>
+        </header>
+
+        <div class="summary-card">
+            <h2>Total: <span id="total-calories">0</span> kcal</h2>
+        </div>
+
+        <section class="form-section">
+            <form id="calorie-form" onsubmit="event.preventDefault(); addEntry();">
+                <input type="text" id="food-name" placeholder="Food Name" required>
+                <input type="number" id="calories" placeholder="Calories" min="1" required>
+                <button type="submit" id="add-btn">Add Entry</button>
+            </form>
+        </section>
+
+        <section class="list-section">
+            <ul id="calorie-list"></ul>
+        </section>
+    </div>
+
+    <div id="edit-modal" class="modal">
+        <div class="modal-content">
+            <h3>Edit Entry</h3>
+            <p id="edit-error" style="color: #ef4444; display: none; font-size: 0.8rem; margin-bottom: 10px;"></p>
+            <input type="hidden" id="edit-id">
+            <input type="text" id="edit-food-name" placeholder="Food Name" required>
+            <input type="number" id="edit-calories" placeholder="Calories" min="1" required>
+            <div class="modal-actions">
+                <button onclick="saveEdit()" class="save-btn">Save Changes</button>
+                <button onclick="closeModal()" class="cancel-btn">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="delete-modal" class="modal">
+        <div class="modal-content">
+            <h3>Confirm Delete</h3>
+            <p>Are you sure you want to remove this entry? This action cannot be undone.</p>
+            <input type="hidden" id="delete-id">
+            <div class="modal-actions">
+                <button onclick="confirmDelete()" class="delete-confirm-btn">Delete</button>
+                <button onclick="closeDeleteModal()" class="cancel-btn">Cancel</button>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
