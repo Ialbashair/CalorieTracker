@@ -36,12 +36,18 @@
 - Using Fetch
 
 # Installation (Windows)
+First, navigate to the desired folder in File Explorer, right click and select "open in terminal".
+Then, use the command:
+```
+git clone https://github.com/Ialbashair/CalorieTracker.git
+```
+Then open the newly created CalorieTracker folder in vscode and enter the following in the terminal:
 ```
 py -m venv venv
 .\venv\Scripts\activate
 pip install -r requirements.txt
 ```
-# Running
+# Running from Terminal
 ```
 uvicorn main:app
 ```
