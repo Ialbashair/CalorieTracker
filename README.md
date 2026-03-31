@@ -34,3 +34,14 @@
 ## JavaScript
 - Using FastAPI
 - Using Fetch
+
+# Installation (Windows)
+```
+py -m venv venv
+.\venv\Scripts\activate
+pip install -r requirements.txt
+```
+# Running
+```
+uvicorn main:app
+```
