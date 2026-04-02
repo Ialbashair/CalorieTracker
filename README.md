@@ -48,6 +48,7 @@ py -m venv venv
 pip install -r requirements.txt
 ```
 # Running from Terminal
+While venv is active:
 ```
 uvicorn main:app
 ```
