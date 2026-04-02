@@ -56,8 +56,8 @@ uvicorn main:app
 ## Merging Branches
 This contains any weird errors to the sub branch rather than pushing it to main.
 ```
-git pull
 git checkout <my-branch>
+git pull
 git merge main
 git checkout main
 git merge <my-branch>
