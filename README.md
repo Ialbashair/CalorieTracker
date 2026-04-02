@@ -35,7 +35,8 @@
 - Using FastAPI
 - Using Fetch
 
-# Installation (Windows)
+# Technical Details
+## Installation (Windows)
 First, navigate to the desired folder in File Explorer, right click and select "open in terminal".
 Then, use the command:
 ```
@@ -47,8 +48,17 @@ py -m venv venv
 .\venv\Scripts\activate
 pip install -r requirements.txt
 ```
-# Running from Terminal
+## Running from Terminal
 While venv is active:
 ```
 uvicorn main:app
+```
+## Merging Branches
+This contains any weird errors to the sub branch rather than pushing it to main.
+```
+git pull
+git checkout <my-branch>
+git merge main
+git checkout main
+git merge <my-branch>
 ```
