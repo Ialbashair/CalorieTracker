@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nutri - Register</title>
+    <link rel="icon" type="image/x-icon" href="/static/favicon.ico">
+    <link rel="stylesheet" href="/static/style.css">
+    <script src="/static/script.js"></script>
+</head>
+<body>
+    <div class="container auth-container">
+        <header>
+            <h1>Create Account</h1>
+            <p>Join Nutri and start tracking your nutrition.</p>
+        </header>
+
+        <section class="form-section">
+            <form id="register-form">
+                <input type="text" id="register-username" placeholder="Username" required>
+                <input type="email" id="register-email" placeholder="Email" required>
+                <input type="password" id="register-password" placeholder="Password" required>
+                <button type="submit" id="register-btn">Register</button>
+            </form>
+        </section>
+
+        <p id="register-message" class="auth-message"></p>
+
+        <div class="auth-links">
+            <p>Already have an account?</p>
+            <a href="/login">Go to Login</a>
+        </div>
+    </div>
+</body>
+</html>
