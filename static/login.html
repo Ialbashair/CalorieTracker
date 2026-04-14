@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nutri - Login</title>
+    <link rel="icon" type="image/x-icon" href="/static/favicon.ico">
+    <link rel="stylesheet" href="/static/style.css">
+    <script src="/static/script.js"></script>
+</head>
+<body>
+    <div class="container auth-container">
+        <header>
+            <h1>Login</h1>
+            <p>Welcome back to Nutri.</p>
+        </header>
+
+        <section class="form-section">
+            <form id="login-form">
+                <input type="email" id="login-email" placeholder="Email" required>
+                <input type="password" id="login-password" placeholder="Password" required>
+                <button type="submit" id="login-btn">Login</button>
+            </form>
+        </section>
+
+        <p id="login-message" class="auth-message"></p>
+
+        <div class="auth-links">
+            <p>Need an account?</p>
+            <a href="/register">Go to Register</a>
+        </div>
+    </div>
+</body>
+</html>
