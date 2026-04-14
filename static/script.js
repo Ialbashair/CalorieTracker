@@ -1,9 +1,13 @@
+console.log("SCRIPT.JS LOADED");
+console.log("NEW SCRIPT FILE IS LOADED");
+
 const API_URL = "/entries";
 const REGISTER_URL = "/register";
 const LOGIN_URL = "/login";
 
-// Run the correct setup depending on which page is open
+// Run page-specific setup
 window.onload = () => {
+    console.log("js loaded");
     setupRegisterForm();
     setupLoginForm();
     setupCaloriePage();
@@ -14,13 +18,25 @@ function setupRegisterForm() {
     const registerForm = document.getElementById("register-form");
     if (!registerForm) return;
 
+    console.log("Register form found");
+
     registerForm.addEventListener("submit", async (event) => {
         event.preventDefault();
+        console.log("Register form submitted");
 
-        const username = document.getElementById("register-username").value.trim();
-        const email = document.getElementById("register-email").value.trim();
-        const password = document.getElementById("register-password").value.trim();
+        const usernameInput = document.getElementById("register-username");
+        const emailInput = document.getElementById("register-email");
+        const passwordInput = document.getElementById("register-password");
         const message = document.getElementById("register-message");
+
+        if (!usernameInput || !emailInput || !passwordInput || !message) {
+            console.error("Register page elements missing");
+            return;
+        }
+
+        const username = usernameInput.value.trim();
+        const email = emailInput.value.trim();
+        const password = passwordInput.value.trim();
 
         try {
             const response = await fetch(REGISTER_URL, {
@@ -34,13 +50,14 @@ function setupRegisterForm() {
             });
 
             const data = await response.json();
+            console.log("Register response:", data);
 
             if (response.ok) {
                 message.textContent = "Registration successful. Redirecting to login...";
                 message.style.color = "green";
 
                 setTimeout(() => {
-                    window.location.href = "/static/login.html";
+                    window.location.href = "/login";
                 }, 1200);
             } else {
                 message.textContent = data.detail || "Registration failed.";
@@ -59,12 +76,23 @@ function setupLoginForm() {
     const loginForm = document.getElementById("login-form");
     if (!loginForm) return;
 
+    console.log("Login form found");
+
     loginForm.addEventListener("submit", async (event) => {
         event.preventDefault();
+        console.log("Login form submitted");
 
-        const email = document.getElementById("login-email").value.trim();
-        const password = document.getElementById("login-password").value.trim();
+        const emailInput = document.getElementById("login-email");
+        const passwordInput = document.getElementById("login-password");
         const message = document.getElementById("login-message");
+
+        if (!emailInput || !passwordInput || !message) {
+            console.error("Login page elements missing");
+            return;
+        }
+
+        const email = emailInput.value.trim();
+        const password = passwordInput.value.trim();
 
         try {
             const response = await fetch(LOGIN_URL, {
@@ -77,6 +105,7 @@ function setupLoginForm() {
             });
 
             const data = await response.json();
+            console.log("Login response:", data);
 
             if (response.ok) {
                 localStorage.setItem("nutriUser", JSON.stringify(data.user));
@@ -85,7 +114,7 @@ function setupLoginForm() {
                 message.style.color = "green";
 
                 setTimeout(() => {
-                    window.location.href = "/";
+                    window.location.href = "/tracker";
                 }, 1000);
             } else {
                 message.textContent = data.detail || "Login failed.";
@@ -99,16 +128,21 @@ function setupLoginForm() {
     });
 }
 
-// ---------- Main calorie tracker page ----------
+// ---------- Tracker page ----------
 function setupCaloriePage() {
     const calorieList = document.getElementById("calorie-list");
-    if (!calorieList) return;
+    const totalDisplay = document.getElementById("total-calories");
+
+    // If tracker-only elements are not on the page, stop here
+    if (!calorieList || !totalDisplay) return;
+
+    console.log("Tracker page detected");
 
     const currentUser = getCurrentUser();
 
-    // If not logged in, send user to login page
+    // If user is not logged in, redirect away from tracker
     if (!currentUser) {
-        window.location.href = "/static/login.html";
+        window.location.href = "/login";
         return;
     }
 
@@ -123,12 +157,12 @@ function getCurrentUser() {
 
 function logoutUser() {
     localStorage.removeItem("nutriUser");
-    window.location.href = "/static/login.html";
+    window.location.href = "/login";
 }
 
 function renderUserHeader(user) {
     const header = document.querySelector("header");
-    if (!header) return;
+    if (!header || !user) return;
 
     let userBar = document.getElementById("user-bar");
 
@@ -145,12 +179,19 @@ function renderUserHeader(user) {
     }
 
     userBar.innerHTML = `
-        <span>Logged in as <strong>${user.username}</strong></span>
+        <span>Logged in as <strong>${escapeHtml(user.username)}</strong></span>
         <button onclick="logoutUser()">Logout</button>
     `;
 }
 
+// ---------- Calories CRUD ----------
 async function loadCalories() {
+    const listElement = document.getElementById("calorie-list");
+    const totalDisplay = document.getElementById("total-calories");
+
+    // Prevent running on login/register pages
+    if (!listElement || !totalDisplay) return;
+
     try {
         const response = await fetch(API_URL);
         const data = await response.json();
@@ -164,8 +205,10 @@ async function addEntry() {
     const nameInput = document.getElementById("food-name");
     const calInput = document.getElementById("calories");
 
+    if (!nameInput || !calInput) return;
+
     const newEntry = {
-        food_name: nameInput.value,
+        food_name: nameInput.value.trim(),
         calories: parseInt(calInput.value)
     };
 
@@ -180,6 +223,9 @@ async function addEntry() {
             nameInput.value = "";
             calInput.value = "";
             loadCalories();
+        } else {
+            const data = await response.json();
+            console.error("Add entry failed:", data);
         }
     } catch (error) {
         console.error("Error adding entry:", error);
@@ -187,16 +233,27 @@ async function addEntry() {
 }
 
 function openDeleteModal(id) {
-    document.getElementById("delete-id").value = id;
-    document.getElementById("delete-modal").style.display = "block";
+    const deleteIdInput = document.getElementById("delete-id");
+    const deleteModal = document.getElementById("delete-modal");
+
+    if (!deleteIdInput || !deleteModal) return;
+
+    deleteIdInput.value = id;
+    deleteModal.style.display = "block";
 }
 
 function closeDeleteModal() {
-    document.getElementById("delete-modal").style.display = "none";
+    const deleteModal = document.getElementById("delete-modal");
+    if (!deleteModal) return;
+
+    deleteModal.style.display = "none";
 }
 
 async function confirmDelete() {
-    const id = document.getElementById("delete-id").value;
+    const deleteIdInput = document.getElementById("delete-id");
+    if (!deleteIdInput) return;
+
+    const id = deleteIdInput.value;
 
     try {
         const res = await fetch(`${API_URL}/${id}`, {
@@ -206,6 +263,9 @@ async function confirmDelete() {
         if (res.ok) {
             closeDeleteModal();
             loadCalories();
+        } else {
+            const data = await res.json();
+            console.error("Delete failed:", data);
         }
     } catch (error) {
         console.error("Delete failed:", error);
@@ -213,20 +273,36 @@ async function confirmDelete() {
 }
 
 function openEditModal(id, name, calories) {
-    document.getElementById("edit-id").value = id;
-    document.getElementById("edit-food-name").value = name;
-    document.getElementById("edit-calories").value = calories;
-    document.getElementById("edit-modal").style.display = "block";
+    const editId = document.getElementById("edit-id");
+    const editFoodName = document.getElementById("edit-food-name");
+    const editCalories = document.getElementById("edit-calories");
+    const editModal = document.getElementById("edit-modal");
+
+    if (!editId || !editFoodName || !editCalories || !editModal) return;
+
+    editId.value = id;
+    editFoodName.value = name;
+    editCalories.value = calories;
+    editModal.style.display = "block";
 }
 
 function closeModal() {
-    document.getElementById("edit-modal").style.display = "none";
+    const editModal = document.getElementById("edit-modal");
+    if (!editModal) return;
+
+    editModal.style.display = "none";
 }
 
 async function saveEdit() {
-    const id = document.getElementById("edit-id").value;
-    const name = document.getElementById("edit-food-name").value;
-    const calories = document.getElementById("edit-calories").value;
+    const editId = document.getElementById("edit-id");
+    const editFoodName = document.getElementById("edit-food-name");
+    const editCalories = document.getElementById("edit-calories");
+
+    if (!editId || !editFoodName || !editCalories) return;
+
+    const id = editId.value;
+    const name = editFoodName.value.trim();
+    const calories = editCalories.value;
 
     const updatedData = {
         food_name: name,
@@ -243,6 +319,9 @@ async function saveEdit() {
         if (response.ok) {
             closeModal();
             loadCalories();
+        } else {
+            const data = await response.json();
+            console.error("Update failed:", data);
         }
     } catch (error) {
         console.error("Error updating entry:", error);
@@ -253,6 +332,9 @@ function renderList(entries) {
     const listElement = document.getElementById("calorie-list");
     const totalDisplay = document.getElementById("total-calories");
 
+    // Prevent running on login/register pages
+    if (!listElement || !totalDisplay) return;
+
     listElement.innerHTML = "";
     let total = 0;
 
@@ -261,17 +343,31 @@ function renderList(entries) {
 
         const li = document.createElement("li");
         li.className = "item";
+
+        const safeName = escapeHtml(item.food_name);
+
         li.innerHTML = `
             <div class="item-info">
-                <strong>${item.food_name}</strong> - ${item.calories} kcal
+                <strong>${safeName}</strong> - ${item.calories} kcal
             </div>
             <div class="actions">
-                <button class="edit-btn" onclick="openEditModal('${item.id}', '${item.food_name}', ${item.calories})">Edit</button>
+                <button class="edit-btn" onclick="openEditModal('${item.id}', ${JSON.stringify(item.food_name)}, ${item.calories})">Edit</button>
                 <button class="delete-btn" onclick="openDeleteModal('${item.id}')">Delete</button>
             </div>
         `;
+
         listElement.appendChild(li);
     });
 
     totalDisplay.innerText = total;
+}
+
+// ---------- Small helper ----------
+function escapeHtml(value) {
+    return String(value)
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#39;");
 }
