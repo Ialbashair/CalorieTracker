@@ -1,5 +1,4 @@
 console.log("SCRIPT.JS LOADED");
-console.log("NEW SCRIPT FILE IS LOADED");
 
 const API_URL = "/entries";
 const REGISTER_URL = "/register";
