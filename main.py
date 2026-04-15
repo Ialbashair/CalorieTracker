@@ -1,6 +1,7 @@
 # ---------- Imports ----------
 from fastapi import FastAPI, HTTPException, status
 from pydantic import BaseModel, EmailStr
+from pydantic_settings import BaseSettings, SettingsConfigDict
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, RedirectResponse
 from typing import List, Optional
@@ -12,7 +13,12 @@ from passlib.context import CryptContext
 app = FastAPI()
 
 # ---------- MongoDB setup ----------
-MONGO_URL = "mongodb+srv://VSCODEUSER:VS4321@calorietracker.tpxabyz.mongodb.net/?authMechanism=SCRAM-SHA-1"
+class MongoDBSettings(BaseSettings):
+    url: str = ""
+
+    model_config = SettingsConfigDict(env_file="./.env")
+
+MONGO_URL = MongoDBSettings().url
 
 client = MongoClient(MONGO_URL)
 database = client["Nutri"]
