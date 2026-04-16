@@ -185,14 +185,15 @@ function renderUserHeader(user) {
 
 // ---------- Calories CRUD ----------
 async function loadCalories() {
+    const currentUser = getCurrentUser();
     const listElement = document.getElementById("calorie-list");
     const totalDisplay = document.getElementById("total-calories");
 
-    // Prevent running on login/register pages
-    if (!listElement || !totalDisplay) return;
+    // Prevent running on non-tracker pages
+    if (!currentUser || !listElement || !totalDisplay) return;
 
     try {
-        const response = await fetch(API_URL);
+        const response = await fetch(`${API_URL}/${currentUser.id}`);
         const data = await response.json();
         renderList(data);
     } catch (error) {
@@ -201,12 +202,14 @@ async function loadCalories() {
 }
 
 async function addEntry() {
+    const currentUser = getCurrentUser();
     const nameInput = document.getElementById("food-name");
     const calInput = document.getElementById("calories");
 
-    if (!nameInput || !calInput) return;
+    if (!currentUser || !nameInput || !calInput) return;
 
     const newEntry = {
+        user_id: currentUser.id,
         food_name: nameInput.value.trim(),
         calories: parseInt(calInput.value)
     };
@@ -249,13 +252,15 @@ function closeDeleteModal() {
 }
 
 async function confirmDelete() {
+    const currentUser = getCurrentUser();
     const deleteIdInput = document.getElementById("delete-id");
-    if (!deleteIdInput) return;
+
+    if (!currentUser || !deleteIdInput) return;
 
     const id = deleteIdInput.value;
 
     try {
-        const res = await fetch(`${API_URL}/${id}`, {
+        const res = await fetch(`${API_URL}/${id}/${currentUser.id}`, {
             method: "DELETE"
         });
 
@@ -293,11 +298,12 @@ function closeModal() {
 }
 
 async function saveEdit() {
+    const currentUser = getCurrentUser();
     const editId = document.getElementById("edit-id");
     const editFoodName = document.getElementById("edit-food-name");
     const editCalories = document.getElementById("edit-calories");
 
-    if (!editId || !editFoodName || !editCalories) return;
+    if (!currentUser || !editId || !editFoodName || !editCalories) return;
 
     const id = editId.value;
     const name = editFoodName.value.trim();
@@ -309,7 +315,7 @@ async function saveEdit() {
     };
 
     try {
-        const response = await fetch(`${API_URL}/${id}`, {
+        const response = await fetch(`${API_URL}/${id}/${currentUser.id}`, {
             method: "PUT",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(updatedData)
@@ -331,7 +337,6 @@ function renderList(entries) {
     const listElement = document.getElementById("calorie-list");
     const totalDisplay = document.getElementById("total-calories");
 
-    // Prevent running on login/register pages
     if (!listElement || !totalDisplay) return;
 
     listElement.innerHTML = "";
