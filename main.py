@@ -44,6 +44,7 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
 # Once auth works, you can switch email back to EmailStr.
 class CalorieEntry(BaseModel):
     id: Optional[str] = None
+    user_id: str
     food_name: str
     calories: int
 
@@ -66,6 +67,7 @@ class UserOut(BaseModel):
 def serialize_entry(entry) -> dict:
     return {
         "id": str(entry["_id"]),
+        "user_id": entry["user_id"],
         "food_name": entry["food_name"],
         "calories": entry["calories"]
     }
@@ -137,10 +139,9 @@ def login_user(user: UserLogin):
         raise HTTPException(status_code=500, detail=f"Login failed: {repr(e)}")
 
 # ---------- Calorie entry routes ----------
-@app.get("/entries", response_model=List[CalorieEntry])
-def get_all_entries():
-    print("GET /entries hit", flush=True)
-    entries = entries_collection.find()
+@app.get("/entries/{user_id}", response_model=List[CalorieEntry])
+def get_user_entries(user_id: str):
+    entries = entries_collection.find({"user_id": user_id})
     return [serialize_entry(entry) for entry in entries]
 
 @app.post("/entries", response_model=CalorieEntry, status_code=status.HTTP_201_CREATED)
@@ -150,6 +151,7 @@ def add_entry(entry: CalorieEntry):
 
     try:
         entry_dict = {
+            "user_id": entry.user_id,
             "food_name": entry.food_name,
             "calories": entry.calories
         }
@@ -166,8 +168,8 @@ def add_entry(entry: CalorieEntry):
         print("ADD ENTRY ERROR:", repr(e), flush=True)
         raise HTTPException(status_code=500, detail=f"Add entry failed: {repr(e)}")
 
-@app.put("/entries/{entry_id}", response_model=CalorieEntry)
-def update_entry(entry_id: str, updated_item: CalorieEntry):
+@app.put("/entries/{entry_id}/{user_id}", response_model=CalorieEntry)
+def update_entry(entry_id: str, user_id: str, updated_item: CalorieEntry):
     print(f"PUT /entries/{entry_id} hit", flush=True)
     print("Incoming updated item:", updated_item.model_dump(), flush=True)
 
@@ -177,7 +179,10 @@ def update_entry(entry_id: str, updated_item: CalorieEntry):
             raise HTTPException(status_code=400, detail="Invalid entry ID")
 
         result = entries_collection.update_one(
-            {"_id": ObjectId(entry_id)},
+            {
+                "_id": ObjectId(entry_id),
+                "user_id": user_id
+            },
             {
                 "$set": {
                     "food_name": updated_item.food_name,
@@ -185,13 +190,17 @@ def update_entry(entry_id: str, updated_item: CalorieEntry):
                 }
             }
         )
+
         print("Matched count:", result.matched_count, flush=True)
         print("Modified count:", result.modified_count, flush=True)
 
         if result.matched_count == 0:
             raise HTTPException(status_code=404, detail="Item not found")
 
-        updated_entry = entries_collection.find_one({"_id": ObjectId(entry_id)})
+        updated_entry = entries_collection.find_one({
+            "_id": ObjectId(entry_id),
+            "user_id": user_id
+        })
         print("Fetched updated entry:", updated_entry, flush=True)
 
         return serialize_entry(updated_entry)
@@ -202,8 +211,8 @@ def update_entry(entry_id: str, updated_item: CalorieEntry):
         print("UPDATE ENTRY ERROR:", repr(e), flush=True)
         raise HTTPException(status_code=500, detail=f"Update failed: {repr(e)}")
 
-@app.delete("/entries/{entry_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_entry(entry_id: str):
+@app.delete("/entries/{entry_id}/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_entry(entry_id: str, user_id: str):
     print(f"DELETE /entries/{entry_id} hit", flush=True)
 
     try:
@@ -211,7 +220,11 @@ def delete_entry(entry_id: str):
             print("Invalid ObjectId for delete", flush=True)
             raise HTTPException(status_code=400, detail="Invalid entry ID")
 
-        result = entries_collection.delete_one({"_id": ObjectId(entry_id)})
+        result = entries_collection.delete_one({
+            "_id": ObjectId(entry_id),
+            "user_id": user_id
+        })
+
         print("Deleted count:", result.deleted_count, flush=True)
 
         if result.deleted_count == 0:
@@ -224,7 +237,6 @@ def delete_entry(entry_id: str):
     except Exception as e:
         print("DELETE ENTRY ERROR:", repr(e), flush=True)
         raise HTTPException(status_code=500, detail=f"Delete failed: {repr(e)}")
-
 # ---------- Static assets ----------
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
