@@ -29,6 +29,8 @@ database = client["Nutri"]
 # Collections
 entries_collection = database["Food_logs"]
 users_collection = database["User_Info"]
+exercises_collection = database["Exercises"]
+exercise_logs_collection = database["Exercise_logs"]
 
 print("Connected to database:", database.name, flush=True)
 print("Entries collection:", entries_collection.name, flush=True)
@@ -68,6 +70,12 @@ class UserOut(BaseModel):
     username: str
     email: str
     role: str
+
+class ExerciseLog(BaseModel):
+    id: Optional[str] = None
+    user_id: str
+    exercise_name: str
+    calories_burned: int
 
 # ---------- Helper functions ----------
 def serialize_entry(entry) -> dict:
@@ -143,6 +151,42 @@ def login_user(user: UserLogin):
     except Exception as e:
         print("LOGIN ERROR:", repr(e), flush=True)
         raise HTTPException(status_code=500, detail=f"Login failed: {repr(e)}")
+
+
+# ---------- Exercise routes ----------
+@app.get("/exercises")
+def get_exercises():
+    exercises = exercises_collection.find({}, {"_id": 0, "name": 1, "calories_per_hour": 1})
+    return [{"name": e["name"], "calories_per_hour": e["calories_per_hour"]} for e in exercises]
+
+@app.get("/exercise-logs/{user_id}", response_model=List[ExerciseLog])
+def get_exercise_logs(user_id: str):
+    logs = exercise_logs_collection.find({"user_id": user_id})
+    return [
+        {
+            "id": str(log["_id"]),
+            "user_id": log["user_id"],
+            "exercise_name": log["exercise_name"],
+            "calories_burned": log["calories_burned"]
+        }
+        for log in logs
+    ]
+
+@app.post("/exercise-logs", response_model=ExerciseLog, status_code=status.HTTP_201_CREATED)
+def add_exercise_log(log: ExerciseLog):
+    log_dict = {
+        "user_id": log.user_id,
+        "exercise_name": log.exercise_name,
+        "calories_burned": log.calories_burned
+    }
+    result = exercise_logs_collection.insert_one(log_dict)
+    new_log = exercise_logs_collection.find_one({"_id": result.inserted_id})
+    return {
+        "id": str(new_log["_id"]),
+        "user_id": new_log["user_id"],
+        "exercise_name": new_log["exercise_name"],
+        "calories_burned": new_log["calories_burned"]
+    }
 
 # ---------- Calorie entry routes ----------
 @app.get("/entries/{user_id}", response_model=List[CalorieEntry])

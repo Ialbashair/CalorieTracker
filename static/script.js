@@ -147,6 +147,7 @@ function setupCaloriePage() {
 
     renderUserHeader(currentUser);
     loadCalories();
+    loadExerciseLogs();
 }
 
 function getCurrentUser() {
@@ -426,6 +427,48 @@ function renderList(entries) {
 
 // ---- Exercise Section ----
 
+async function loadExerciseLogs() {
+    const currentUser = getCurrentUser();
+    if (!currentUser) return;
+
+    try {
+        const response = await fetch(`/exercise-logs/${currentUser.id}`);
+        const data = await response.json();
+        renderExerciseList(data);
+    } catch (error) {
+        console.error("Error fetching exercise logs:", error);
+    }
+}
+
+function renderExerciseList(logs) {
+    const listElement = document.getElementById("exercise-list");
+    const emptyLabel = document.getElementById("exercise-empty");
+    if (!listElement) return;
+
+    listElement.innerHTML = "";
+
+    if (logs.length === 0) {
+        emptyLabel.style.display = "block";
+    } else {
+        emptyLabel.style.display = "none";
+    }
+
+    logs.forEach(log => {
+        const li = document.createElement("li");
+        li.className = "item";
+
+        const itemInfo = document.createElement("div");
+        itemInfo.className = "item-info";
+        const strong = document.createElement("strong");
+        strong.textContent = escapeHtml(log.exercise_name);
+        itemInfo.appendChild(strong);
+        itemInfo.append(` - ${log.calories_burned} kcal burned`);
+
+        li.appendChild(itemInfo);
+        listElement.appendChild(li);
+    });
+}
+
 function limitDecimals(input, maxPlaces) {
     input.value = input.value.replace(/[^0-9.]/g, "");
     const parts = input.value.split(".");
@@ -438,8 +481,59 @@ function limitDecimals(input, maxPlaces) {
     }
 }
 
-function openAddExerciseModal() {
+let exerciseList = [];
+let selectedExercise = null;
+
+async function openAddExerciseModal() {
     document.getElementById("add-exercise-modal").style.display = "block";
+
+    try {
+        const response = await fetch("/exercises");
+        if (response.ok) {
+            exerciseList = await response.json();
+        }
+    } catch (error) {
+        console.error("Error fetching exercises:", error);
+    }
+
+    const searchInput = document.getElementById("exercise-search");
+    searchInput.focus();
+    searchInput.oninput = () => filterExerciseSearch(searchInput.value);
+}
+
+function filterExerciseSearch(query) {
+    const resultsEl = document.getElementById("exercise-results");
+    resultsEl.innerHTML = "";
+    selectedExercise = null;
+
+    if (!query.trim()) {
+        resultsEl.style.display = "none";
+        return;
+    }
+
+    const lower = query.toLowerCase();
+    const matches = exerciseList.filter(ex =>
+        ex.name.toLowerCase().includes(lower)
+    );
+
+    if (matches.length === 0) {
+        resultsEl.style.display = "none";
+        return;
+    }
+
+    matches.forEach(ex => {
+        const li = document.createElement("li");
+        li.textContent = ex.name;
+        li.onclick = () => {
+            document.getElementById("exercise-search").value = ex.name;
+            selectedExercise = ex;
+            resultsEl.innerHTML = "";
+            resultsEl.style.display = "none";
+        };
+        resultsEl.appendChild(li);
+    });
+
+    resultsEl.style.display = "block";
 }
 
 function closeAddExerciseModal() {
@@ -447,17 +541,22 @@ function closeAddExerciseModal() {
     document.getElementById("exercise-search").value = "";
     document.getElementById("exercise-hours").value = "";
     document.getElementById("exercise-error").style.display = "none";
+    document.getElementById("exercise-results").innerHTML = "";
+    document.getElementById("exercise-results").style.display = "none";
+    exerciseList = [];
+    selectedExercise = null;
 }
 
-function addExerciseEntry() {
+async function addExerciseEntry() {
+    const currentUser = getCurrentUser();
     const search = document.getElementById("exercise-search").value.trim();
     const hoursInput = document.getElementById("exercise-hours").value.trim();
     const errorEl = document.getElementById("exercise-error");
 
     errorEl.style.display = "none";
 
-    if (!search) {
-        errorEl.textContent = "Please enter an exercise name.";
+    if (!selectedExercise) {
+        errorEl.textContent = "Please select an exercise from the list.";
         errorEl.style.display = "block";
         return;
     }
@@ -483,7 +582,32 @@ function addExerciseEntry() {
         return;
     }
 
-    // TODO: Implement once exercise database is connected
+    const caloriesBurned = Math.round(selectedExercise.calories_per_hour * hours);
+
+    try {
+        const response = await fetch("/exercise-logs", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                user_id: currentUser.id,
+                exercise_name: selectedExercise.name,
+                calories_burned: caloriesBurned
+            })
+        });
+
+        if (response.ok) {
+            closeAddExerciseModal();
+            loadExerciseLogs();
+        } else {
+            const data = await response.json();
+            errorEl.textContent = data.detail || "Failed to log exercise.";
+            errorEl.style.display = "block";
+        }
+    } catch (error) {
+        console.error("Error logging exercise:", error);
+        errorEl.textContent = "Something went wrong.";
+        errorEl.style.display = "block";
+    }
 }
 
 // ---------- Small helper ----------
