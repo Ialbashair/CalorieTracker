@@ -6,7 +6,6 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, RedirectResponse
 from typing import List, Optional
 from pymongo import MongoClient
-from bson import ObjectId
 from passlib.context import CryptContext
 
 # ---------- Initialize app ----------
@@ -27,14 +26,16 @@ client = MongoClient(MONGO_URL)
 database = client["Nutri"]
 
 # Collections
-entries_collection = database["Food_logs"]
 users_collection = database["User_Info"]
+foods_collection = database["Foods"]
+food_logs_collection = database["Food_logs"]
 exercises_collection = database["Exercises"]
 exercise_logs_collection = database["Exercise_logs"]
 
 print("Connected to database:", database.name, flush=True)
-print("Entries collection:", entries_collection.name, flush=True)
 print("Users collection:", users_collection.name, flush=True)
+print("Foods collection:", foods_collection.name, flush=True)
+print("Food logs collection:", food_logs_collection.name, flush=True)
 
 # ---------- Password hashing ----------
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -48,14 +49,6 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
     return pwd_context.verify(plain_password, hashed_password)
 
 # ---------- Pydantic models ----------
-# Temporarily using plain str for email while debugging.
-# Once auth works, you can switch email back to EmailStr.
-class CalorieEntry(BaseModel):
-    id: Optional[str] = None
-    user_id: str
-    food_name: str
-    calories: int
-
 class UserCreate(BaseModel):
     username: str
     email: str
@@ -71,6 +64,12 @@ class UserOut(BaseModel):
     email: str
     role: str
 
+class FoodLog(BaseModel):
+    id: Optional[str] = None
+    user_id: str
+    food_name: str
+    calories: int
+
 class ExerciseLog(BaseModel):
     id: Optional[str] = None
     user_id: str
@@ -78,14 +77,6 @@ class ExerciseLog(BaseModel):
     calories_burned: int
 
 # ---------- Helper functions ----------
-def serialize_entry(entry) -> dict:
-    return {
-        "id": str(entry["_id"]),
-        "user_id": entry["user_id"],
-        "food_name": entry["food_name"],
-        "calories": entry["calories"]
-    }
-
 def serialize_user(user) -> dict:
     return {
         "id": str(user["_id"]),
@@ -153,6 +144,48 @@ def login_user(user: UserLogin):
         raise HTTPException(status_code=500, detail=f"Login failed: {repr(e)}")
 
 
+# ---------- Food routes ----------
+@app.get("/foods")
+def get_foods():
+    foods = foods_collection.find({}, {"_id": 0, "name": 1, "calories": 1, "serving_size_g": 1})
+    return [
+        {
+            "name": f["name"],
+            "calories": f["calories"],
+            "serving_size_g": f["serving_size_g"]
+        }
+        for f in foods
+    ]
+
+@app.get("/food-logs/{user_id}", response_model=List[FoodLog])
+def get_food_logs(user_id: str):
+    logs = food_logs_collection.find({"user_id": user_id})
+    return [
+        {
+            "id": str(log["_id"]),
+            "user_id": log["user_id"],
+            "food_name": log["food_name"],
+            "calories": log["calories"]
+        }
+        for log in logs
+    ]
+
+@app.post("/food-logs", response_model=FoodLog, status_code=status.HTTP_201_CREATED)
+def add_food_log(log: FoodLog):
+    log_dict = {
+        "user_id": log.user_id,
+        "food_name": log.food_name,
+        "calories": log.calories
+    }
+    result = food_logs_collection.insert_one(log_dict)
+    new_log = food_logs_collection.find_one({"_id": result.inserted_id})
+    return {
+        "id": str(new_log["_id"]),
+        "user_id": new_log["user_id"],
+        "food_name": new_log["food_name"],
+        "calories": new_log["calories"]
+    }
+
 # ---------- Exercise routes ----------
 @app.get("/exercises")
 def get_exercises():
@@ -188,105 +221,6 @@ def add_exercise_log(log: ExerciseLog):
         "calories_burned": new_log["calories_burned"]
     }
 
-# ---------- Calorie entry routes ----------
-@app.get("/entries/{user_id}", response_model=List[CalorieEntry])
-def get_user_entries(user_id: str):
-    entries = entries_collection.find({"user_id": user_id})
-    return [serialize_entry(entry) for entry in entries]
-
-@app.post("/entries", response_model=CalorieEntry, status_code=status.HTTP_201_CREATED)
-def add_entry(entry: CalorieEntry):
-    print("POST /entries hit", flush=True)
-    print("Incoming entry payload:", entry.model_dump(), flush=True)
-
-    try:
-        entry_dict = {
-            "user_id": entry.user_id,
-            "food_name": entry.food_name,
-            "calories": entry.calories
-        }
-
-        result = entries_collection.insert_one(entry_dict)
-        print("Inserted entry ID:", result.inserted_id, flush=True)
-
-        new_entry = entries_collection.find_one({"_id": result.inserted_id})
-        print("Fetched inserted entry:", new_entry, flush=True)
-
-        return serialize_entry(new_entry)
-
-    except Exception as e:
-        print("ADD ENTRY ERROR:", repr(e), flush=True)
-        raise HTTPException(status_code=500, detail=f"Add entry failed: {repr(e)}")
-
-@app.put("/entries/{entry_id}/{user_id}", response_model=CalorieEntry)
-def update_entry(entry_id: str, user_id: str, updated_item: CalorieEntry):
-    print(f"PUT /entries/{entry_id} hit", flush=True)
-    print("Incoming updated item:", updated_item.model_dump(), flush=True)
-
-    try:
-        if not ObjectId.is_valid(entry_id):
-            print("Invalid ObjectId for update", flush=True)
-            raise HTTPException(status_code=400, detail="Invalid entry ID")
-
-        result = entries_collection.update_one(
-            {
-                "_id": ObjectId(entry_id),
-                "user_id": user_id
-            },
-            {
-                "$set": {
-                    "food_name": updated_item.food_name,
-                    "calories": updated_item.calories
-                }
-            }
-        )
-
-        print("Matched count:", result.matched_count, flush=True)
-        print("Modified count:", result.modified_count, flush=True)
-
-        if result.matched_count == 0:
-            raise HTTPException(status_code=404, detail="Item not found")
-
-        updated_entry = entries_collection.find_one({
-            "_id": ObjectId(entry_id),
-            "user_id": user_id
-        })
-        print("Fetched updated entry:", updated_entry, flush=True)
-
-        return serialize_entry(updated_entry)
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        print("UPDATE ENTRY ERROR:", repr(e), flush=True)
-        raise HTTPException(status_code=500, detail=f"Update failed: {repr(e)}")
-
-@app.delete("/entries/{entry_id}/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_entry(entry_id: str, user_id: str):
-    print(f"DELETE /entries/{entry_id} hit", flush=True)
-
-    try:
-        if not ObjectId.is_valid(entry_id):
-            print("Invalid ObjectId for delete", flush=True)
-            raise HTTPException(status_code=400, detail="Invalid entry ID")
-
-        result = entries_collection.delete_one({
-            "_id": ObjectId(entry_id),
-            "user_id": user_id
-        })
-
-        print("Deleted count:", result.deleted_count, flush=True)
-
-        if result.deleted_count == 0:
-            raise HTTPException(status_code=404, detail="Item not found")
-
-        return
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        print("DELETE ENTRY ERROR:", repr(e), flush=True)
-        raise HTTPException(status_code=500, detail=f"Delete failed: {repr(e)}")
 # ---------- Static assets ----------
 app.mount("/static", StaticFiles(directory="static"), name="static")
 

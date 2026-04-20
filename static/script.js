@@ -1,6 +1,5 @@
 console.log("SCRIPT.JS LOADED");
 
-const API_URL = "/entries";
 const REGISTER_URL = "/register";
 const LOGIN_URL = "/login";
 
@@ -146,7 +145,7 @@ function setupCaloriePage() {
     }
 
     renderUserHeader(currentUser);
-    loadCalories();
+    loadFoodLogs();
     loadExerciseLogs();
 }
 
@@ -184,213 +183,38 @@ function renderUserHeader(user) {
     `;
 }
 
-// ---------- Calories CRUD ----------
-async function loadCalories() {
-    const currentUser = getCurrentUser();
-    const listElement = document.getElementById("calorie-list");
-    const totalDisplay = document.getElementById("total-calories");
+// ---- Food Section ----
 
-    // Prevent running on non-tracker pages
-    if (!currentUser || !listElement || !totalDisplay) return;
+async function loadFoodLogs() {
+    const currentUser = getCurrentUser();
+    if (!currentUser) return;
 
     try {
-        const response = await fetch(`${API_URL}/${currentUser.id}`);
+        const response = await fetch(`/food-logs/${currentUser.id}`);
         const data = await response.json();
-        renderList(data);
+        renderFoodList(data);
     } catch (error) {
-        console.error("Error fetching data:", error);
+        console.error("Error fetching food logs:", error);
     }
 }
 
-function openAddFoodModal() {
-    document.getElementById("add-food-modal").style.display = "block";
-    document.getElementById("food-name").focus();
-}
-
-function closeAddFoodModal() {
-    document.getElementById("add-food-modal").style.display = "none";
-    document.getElementById("food-name").value = "";
-    document.getElementById("calories").value = "";
-}
-
-async function addEntry() {
-    const currentUser = getCurrentUser();
-    const nameInput = document.getElementById("food-name");
-    const calInput = document.getElementById("calories");
-
-    if (!currentUser || !nameInput || !calInput) return;
-
-    const newEntry = {
-        user_id: currentUser.id,
-        food_name: nameInput.value.trim(),
-        calories: parseInt(calInput.value)
-    };
-
-    try {
-        const response = await fetch(API_URL, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(newEntry)
-        });
-
-        if (response.ok) {
-            closeAddFoodModal();
-            loadCalories();
-            nameInput.value = "";
-            calInput.value = "";
-            loadCalories();
-        } else {
-            const data = await response.json();
-            console.error("Add entry failed:", data);
-        }
-    } catch (error) {
-        console.error("Error adding entry:", error);
-    }
-}
-
-function openDeleteModal(id) {
-    const deleteIdInput = document.getElementById("delete-id");
-    const deleteModal = document.getElementById("delete-modal");
-
-    if (!deleteIdInput || !deleteModal) return;
-
-    deleteIdInput.value = id;
-    deleteModal.style.display = "block";
-}
-
-function closeDeleteModal() {
-    const deleteModal = document.getElementById("delete-modal");
-    if (!deleteModal) return;
-
-    deleteModal.style.display = "none";
-}
-
-async function confirmDelete() {
-    const currentUser = getCurrentUser();
-    const deleteIdInput = document.getElementById("delete-id");
-
-    if (!currentUser || !deleteIdInput) return;
-
-    const id = deleteIdInput.value;
-
-    try {
-        const res = await fetch(`${API_URL}/${id}/${currentUser.id}`, {
-            method: "DELETE"
-        });
-
-        if (res.ok) {
-            closeDeleteModal();
-            loadCalories();
-        } else {
-            const data = await res.json();
-            console.error("Delete failed:", data);
-        }
-    } catch (error) {
-        console.error("Delete failed:", error);
-    }
-}
-
-function openEditModal(id, name, calories) {
-    const editId = document.getElementById("edit-id");
-    const editFoodName = document.getElementById("edit-food-name");
-    const editCalories = document.getElementById("edit-calories");
-    const editModal = document.getElementById("edit-modal");
-
-    if (!editId || !editFoodName || !editCalories || !editModal) return;
-
-    editId.value = id;
-    editFoodName.value = name;
-    editCalories.value = calories;
-    editModal.style.display = "block";
-}
-
-function closeModal() {
-    const editModal = document.getElementById("edit-modal");
-    if (!editModal) return;
-
-    editModal.style.display = "none";
-}
-
-async function saveEdit() {
-    const currentUser = getCurrentUser();
-    const editId = document.getElementById("edit-id");
-    const editFoodName = document.getElementById("edit-food-name");
-    const editCalories = document.getElementById("edit-calories");
-
-    if (!currentUser || !editId || !editFoodName || !editCalories) return;
-
-    const id = editId.value;
-    const name = editFoodName.value.trim();
-    const calories = editCalories.value;
-
-    const updatedData = {
-        food_name: name,
-        calories: parseInt(calories)
-    };
-
-    try {
-        const response = await fetch(`${API_URL}/${id}/${currentUser.id}`, {
-            method: "PUT",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(updatedData)
-        });
-
-        if (response.ok) {
-            closeModal();
-            loadCalories();
-        } else {
-            const data = await response.json();
-            console.error("Update failed:", data);
-        }
-    } catch (error) {
-        console.error("Error updating entry:", error);
-    }
-}
-
-function openDeleteModal(id) {
-    document.getElementById("delete-id").value = id;
-    document.getElementById("delete-modal").style.display = "block";
-}
-
-function closeDeleteModal() {
-    document.getElementById("delete-modal").style.display = "none";
-}
-
-async function confirmDelete() {
-    const id = document.getElementById("delete-id").value;
-
-    try {
-        const res = await fetch(`${API_URL}/${id}`, {
-            method: "DELETE"
-        });
-
-        if (res.ok) {
-            closeDeleteModal();
-            loadCalories();
-        }
-    } catch (error) {
-        console.error("Delete failed:", error);
-    }
-}
-
-function renderList(entries) {
+function renderFoodList(logs) {
     const listElement = document.getElementById("calorie-list");
     const totalDisplay = document.getElementById("total-calories");
-    if (!listElement || !totalDisplay) return;
-
     const emptyLabel = document.getElementById("food-empty");
+    if (!listElement || !totalDisplay) return;
 
     listElement.innerHTML = "";
     let total = 0;
 
-    if (entries.length === 0) {
+    if (logs.length === 0) {
         emptyLabel.style.display = "block";
     } else {
         emptyLabel.style.display = "none";
     }
 
-    entries.forEach(item => {
-        total += item.calories;
+    logs.forEach(log => {
+        total += log.calories;
 
         const li = document.createElement("li");
         li.className = "item";
@@ -398,31 +222,143 @@ function renderList(entries) {
         const itemInfo = document.createElement("div");
         itemInfo.className = "item-info";
         const strong = document.createElement("strong");
-        strong.textContent = escapeHtml(item.food_name);
+        strong.textContent = escapeHtml(log.food_name);
         itemInfo.appendChild(strong);
-        itemInfo.append(` - ${item.calories} kcal`);
+        itemInfo.append(` - ${log.calories} kcal`);
 
-        const actions = document.createElement("div");
-        actions.className = "actions";
-
-        const editBtn = document.createElement("button");
-        editBtn.className = "edit-btn";
-        editBtn.textContent = "Edit";
-        editBtn.onclick = () => openEditModal(item.id, item.food_name, item.calories);
-
-        const deleteBtn = document.createElement("button");
-        deleteBtn.className = "delete-btn";
-        deleteBtn.textContent = "Delete";
-        deleteBtn.onclick = () => openDeleteModal(item.id);
-
-        actions.appendChild(editBtn);
-        actions.appendChild(deleteBtn);
         li.appendChild(itemInfo);
-        li.appendChild(actions);
         listElement.appendChild(li);
     });
 
     totalDisplay.innerText = total;
+}
+
+let foodList = [];
+let selectedFood = null;
+
+async function openAddFoodModal() {
+    document.getElementById("add-food-modal").style.display = "block";
+
+    try {
+        const response = await fetch("/foods");
+        if (response.ok) {
+            foodList = await response.json();
+        }
+    } catch (error) {
+        console.error("Error fetching foods:", error);
+    }
+
+    const searchInput = document.getElementById("food-search");
+    searchInput.focus();
+    searchInput.oninput = () => filterFoodSearch(searchInput.value);
+}
+
+function filterFoodSearch(query) {
+    const resultsEl = document.getElementById("food-results");
+    resultsEl.innerHTML = "";
+    selectedFood = null;
+
+    if (!query.trim()) {
+        resultsEl.style.display = "none";
+        return;
+    }
+
+    const lower = query.toLowerCase();
+    const matches = foodList.filter(f =>
+        f.name.toLowerCase().includes(lower)
+    );
+
+    if (matches.length === 0) {
+        resultsEl.style.display = "none";
+        return;
+    }
+
+    matches.forEach(f => {
+        const li = document.createElement("li");
+        li.textContent = f.name;
+        li.onclick = () => {
+            document.getElementById("food-search").value = f.name;
+            selectedFood = f;
+            resultsEl.innerHTML = "";
+            resultsEl.style.display = "none";
+        };
+        resultsEl.appendChild(li);
+    });
+
+    resultsEl.style.display = "block";
+}
+
+function closeAddFoodModal() {
+    document.getElementById("add-food-modal").style.display = "none";
+    document.getElementById("food-search").value = "";
+    document.getElementById("food-grams").value = "";
+    document.getElementById("food-error").style.display = "none";
+    document.getElementById("food-results").innerHTML = "";
+    document.getElementById("food-results").style.display = "none";
+    foodList = [];
+    selectedFood = null;
+}
+
+async function addFoodEntry() {
+    const currentUser = getCurrentUser();
+    const gramsInput = document.getElementById("food-grams").value.trim();
+    const errorEl = document.getElementById("food-error");
+
+    errorEl.style.display = "none";
+
+    if (!selectedFood) {
+        errorEl.textContent = "Please select a food from the list.";
+        errorEl.style.display = "block";
+        return;
+    }
+
+    if (!gramsInput) {
+        errorEl.textContent = "Please enter the amount in grams.";
+        errorEl.style.display = "block";
+        return;
+    }
+
+    const grams = parseFloat(gramsInput);
+
+    if (isNaN(grams) || grams <= 0) {
+        errorEl.textContent = "Grams must be a positive number.";
+        errorEl.style.display = "block";
+        return;
+    }
+
+    const decimalParts = gramsInput.split(".");
+    if (decimalParts.length === 2 && decimalParts[1].length > 2) {
+        errorEl.textContent = "Grams can have at most 2 decimal places (e.g. 0.25).";
+        errorEl.style.display = "block";
+        return;
+    }
+
+    const calories = Math.round((selectedFood.calories / selectedFood.serving_size_g) * grams);
+
+    try {
+        const response = await fetch("/food-logs", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                user_id: currentUser.id,
+                food_name: selectedFood.name,
+                calories: calories
+            })
+        });
+
+        if (response.ok) {
+            closeAddFoodModal();
+            loadFoodLogs();
+        } else {
+            const data = await response.json();
+            errorEl.textContent = data.detail || "Failed to log food.";
+            errorEl.style.display = "block";
+        }
+    } catch (error) {
+        console.error("Error logging food:", error);
+        errorEl.textContent = "Something went wrong.";
+        errorEl.style.display = "block";
+    }
 }
 
 // ---- Exercise Section ----
@@ -549,7 +485,6 @@ function closeAddExerciseModal() {
 
 async function addExerciseEntry() {
     const currentUser = getCurrentUser();
-    const search = document.getElementById("exercise-search").value.trim();
     const hoursInput = document.getElementById("exercise-hours").value.trim();
     const errorEl = document.getElementById("exercise-error");
 

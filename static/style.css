@@ -131,12 +131,9 @@ button:active {
     padding: 15px;
     background: #f9fafb;
     border: 1px solid var(--border);
+    border-left: 4px solid var(--primary);
     border-radius: 8px;
     margin-bottom: 10px;
-}
-
-#exercise-list .item {
-    border-left: 4px solid var(--primary);
 }
 
 .item-info {
