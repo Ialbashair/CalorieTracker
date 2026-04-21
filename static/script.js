@@ -2,9 +2,8 @@ console.log("SCRIPT.JS LOADED");
 
 const REGISTER_URL = "/register";
 const LOGIN_URL = "/login";
-let adminUsers = [];
 
-// Run page-specific setup
+// ---------- Page setup ----------
 window.onload = async () => {
     setupRegisterForm();
     setupLoginForm();
@@ -41,6 +40,26 @@ function logoutUser() {
     localStorage.removeItem("nutriUser");
     localStorage.removeItem("nutriToken");
     window.location.href = "/login";
+}
+
+async function fetchCurrentUserFromToken() {
+    const token = getToken();
+    if (!token) return null;
+
+    try {
+        const response = await fetch("/me", {
+            headers: getAuthHeaders(false)
+        });
+
+        if (!response.ok) return null;
+
+        const user = await response.json();
+        localStorage.setItem("nutriUser", JSON.stringify(user));
+        return user;
+    } catch (error) {
+        console.error("Error fetching current user:", error);
+        return null;
+    }
 }
 
 // ---------- Register ----------
@@ -138,44 +157,9 @@ function setupLoginForm() {
     });
 }
 
-// ---------- Tracker page ----------
-async function setupCaloriePage() {
-    const calorieList = document.getElementById("calorie-list");
-    const totalDisplay = document.getElementById("total-calories");
-
-    if (!calorieList || !totalDisplay) return;
-
-    let currentUser = getCurrentUser();
-    const token = getToken();
-
-    if (!token) {
-        window.location.href = "/login";
-        return;
-    }
-
-    currentUser = await fetchCurrentUserFromToken();
-
-    if (!currentUser) {
-        logoutUser();
-        return;
-    }
-
-    renderUserHeader(currentUser);
-    loadFoodLogs();
-    loadExerciseLogs();
-}
-
+// ---------- Shared header ----------
 function renderUserHeader(user) {
     const header = document.querySelector("header");
-
-    const isAdminPage = window.location.pathname === "/admin";
-
-    const navLink = user.role === "admin"
-        ? isAdminPage
-            ? `<a href="/tracker" style="font-weight:600;">Tracker</a>`
-            : `<a href="/admin" style="font-weight:600;">Admin</a>`
-        : "";
-
     if (!header || !user) return;
 
     let userBar = document.getElementById("user-bar");
@@ -192,16 +176,48 @@ function renderUserHeader(user) {
         header.appendChild(userBar);
     }
 
+    const isAdminPage = window.location.pathname === "/admin";
+
+    const navLink = user.role === "admin"
+        ? isAdminPage
+            ? `<a href="/tracker" style="font-weight:600; color: var(--primary); text-decoration:none;">Tracker</a>`
+            : `<a href="/admin" style="font-weight:600; color: var(--primary); text-decoration:none;">Admin</a>`
+        : "";
+
     userBar.innerHTML = `
-    <span>Logged in as <strong>${escapeHtml(user.username)}</strong> (${escapeHtml(user.role)})</span>
-    <div style="display:flex; gap:10px; align-items:center;">
-        ${navLink}
-        <button onclick="logoutUser()">Logout</button>
-    </div>
+        <span>Logged in as <strong>${escapeHtml(user.username)}</strong> (${escapeHtml(user.role)})</span>
+        <div style="display:flex; gap:10px; align-items:center;">
+            ${navLink}
+            <button onclick="logoutUser()">Logout</button>
+        </div>
     `;
 }
 
-// ---------- Food Section ----------
+// ---------- Tracker page ----------
+async function setupCaloriePage() {
+    const calorieList = document.getElementById("calorie-list");
+    const totalDisplay = document.getElementById("total-calories");
+
+    if (!calorieList || !totalDisplay) return;
+
+    const token = getToken();
+    if (!token) {
+        window.location.href = "/login";
+        return;
+    }
+
+    const currentUser = await fetchCurrentUserFromToken();
+    if (!currentUser) {
+        logoutUser();
+        return;
+    }
+
+    renderUserHeader(currentUser);
+    loadFoodLogs();
+    loadExerciseLogs();
+}
+
+// ---------- Food section ----------
 async function loadFoodLogs() {
     try {
         const response = await fetch("/food-logs", {
@@ -244,8 +260,9 @@ function renderFoodList(logs) {
 
         const itemInfo = document.createElement("div");
         itemInfo.className = "item-info";
+
         const strong = document.createElement("strong");
-        strong.textContent = escapeHtml(log.food_name);
+        strong.textContent = log.food_name;
         itemInfo.appendChild(strong);
         itemInfo.append(` - ${log.calories} kcal`);
 
@@ -393,7 +410,7 @@ async function addFoodEntry() {
     }
 }
 
-// ---------- Exercise Section ----------
+// ---------- Exercise section ----------
 async function loadExerciseLogs() {
     try {
         const response = await fetch("/exercise-logs", {
@@ -432,7 +449,7 @@ function renderExerciseList(logs) {
         const itemInfo = document.createElement("div");
         itemInfo.className = "item-info";
         const strong = document.createElement("strong");
-        strong.textContent = escapeHtml(log.exercise_name);
+        strong.textContent = log.exercise_name;
         itemInfo.appendChild(strong);
         itemInfo.append(` - ${log.calories_burned} kcal burned`);
 
@@ -591,25 +608,7 @@ async function addExerciseEntry() {
 }
 
 // ---------- Admin page ----------
-async function fetchCurrentUserFromToken() {
-    const token = getToken();
-    if (!token) return null;
-
-    try {
-        const response = await fetch("/me", {
-            headers: getAuthHeaders(false)
-        });
-
-        if (!response.ok) return null;
-
-        const user = await response.json();
-        localStorage.setItem("nutriUser", JSON.stringify(user));
-        return user;
-    } catch (error) {
-        console.error("Error fetching current user:", error);
-        return null;
-    }
-}
+let adminUsers = [];
 
 async function setupAdminPage() {
     const adminUserList = document.getElementById("admin-user-list");
@@ -637,6 +636,34 @@ async function setupAdminPage() {
 
     renderUserHeader(currentUser);
     loadAdminUsers();
+}
+
+async function loadAdminUsers() {
+    const listElement = document.getElementById("admin-user-list");
+    const emptyLabel = document.getElementById("admin-empty");
+
+    if (!listElement || !emptyLabel) return;
+
+    try {
+        const response = await fetch("/admin/users", {
+            headers: getAuthHeaders(false)
+        });
+
+        if (response.status === 401) {
+            logoutUser();
+            return;
+        }
+
+        if (response.status === 403) {
+            window.location.href = "/tracker";
+            return;
+        }
+
+        adminUsers = await response.json();
+        renderAdminUsers(adminUsers);
+    } catch (error) {
+        console.error("Error loading admin users:", error);
+    }
 }
 
 function renderAdminUsers(users) {
@@ -678,34 +705,6 @@ function renderAdminUsers(users) {
     });
 }
 
-async function loadAdminUsers() {
-    const listElement = document.getElementById("admin-user-list");
-    const emptyLabel = document.getElementById("admin-empty");
-
-    if (!listElement || !emptyLabel) return;
-
-    try {
-        const response = await fetch("/admin/users", {
-            headers: getAuthHeaders(false)
-        });
-
-        if (response.status === 401) {
-            logoutUser();
-            return;
-        }
-
-        if (response.status === 403) {
-            window.location.href = "/tracker";
-            return;
-        }
-
-        adminUsers = await response.json();
-        renderAdminUsers(adminUsers);
-    } catch (error) {
-        console.error("Error loading admin users:", error);
-    }
-}
-
 function filterAdminUsers() {
     const searchInput = document.getElementById("admin-user-search");
     if (!searchInput) return;
@@ -718,28 +717,6 @@ function filterAdminUsers() {
     );
 
     renderAdminUsers(filteredUsers);
-}
-
-async function deleteAdminUser(userId) {
-    const confirmed = confirm("Are you sure you want to delete this user?");
-    if (!confirmed) return;
-
-    try {
-        const response = await fetch(`/admin/users/${userId}`, {
-            method: "DELETE",
-            headers: getAuthHeaders(false)
-        });
-
-        if (response.ok) {
-            loadAdminUsers();
-        } else {
-            const data = await response.json();
-            alert(data.detail || "Failed to delete user.");
-        }
-    } catch (error) {
-        console.error("Error deleting user:", error);
-        alert("Something went wrong.");
-    }
 }
 
 async function changeUserRole(userId, newRole) {
@@ -771,6 +748,28 @@ async function changeUserRole(userId, newRole) {
         console.error("Error updating role:", error);
         alert("Something went wrong.");
         loadAdminUsers();
+    }
+}
+
+async function deleteAdminUser(userId) {
+    const confirmed = confirm("Are you sure you want to delete this user?");
+    if (!confirmed) return;
+
+    try {
+        const response = await fetch(`/admin/users/${userId}`, {
+            method: "DELETE",
+            headers: getAuthHeaders(false)
+        });
+
+        if (response.ok) {
+            loadAdminUsers();
+        } else {
+            const data = await response.json();
+            alert(data.detail || "Failed to delete user.");
+        }
+    } catch (error) {
+        console.error("Error deleting user:", error);
+        alert("Something went wrong.");
     }
 }
 

@@ -84,10 +84,12 @@ def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(bearer_
     except JWTError:
         raise HTTPException(status_code=401, detail="Invalid or expired token")
 
+
 def require_admin(current_user=Depends(get_current_user)):
     if current_user.get("role") != "admin":
         raise HTTPException(status_code=403, detail="Admin access required")
     return current_user
+
 
 # ---------- Pydantic models ----------
 class UserCreate(BaseModel):
@@ -107,8 +109,10 @@ class UserOut(BaseModel):
     email: str
     role: str
 
+
 class UserRoleUpdate(BaseModel):
     role: str
+
 
 class TokenResponse(BaseModel):
     access_token: str
@@ -121,6 +125,7 @@ class FoodLog(BaseModel):
     user_id: str
     food_name: str
     calories: int
+    created_at: Optional[str] = None
 
 
 class FoodLogCreate(BaseModel):
@@ -133,11 +138,13 @@ class ExerciseLog(BaseModel):
     user_id: str
     exercise_name: str
     calories_burned: int
+    created_at: Optional[str] = None
 
 
 class ExerciseLogCreate(BaseModel):
     exercise_name: str
     calories_burned: int
+
 
 class UserSummary(BaseModel):
     id: str
@@ -161,7 +168,8 @@ def serialize_food_log(log) -> dict:
         "id": str(log["_id"]),
         "user_id": log["user_id"],
         "food_name": log["food_name"],
-        "calories": log["calories"]
+        "calories": log["calories"],
+        "created_at": log["created_at"].isoformat() if "created_at" in log and log["created_at"] else None
     }
 
 
@@ -170,7 +178,8 @@ def serialize_exercise_log(log) -> dict:
         "id": str(log["_id"]),
         "user_id": log["user_id"],
         "exercise_name": log["exercise_name"],
-        "calories_burned": log["calories_burned"]
+        "calories_burned": log["calories_burned"],
+        "created_at": log["created_at"].isoformat() if "created_at" in log and log["created_at"] else None
     }
 
 
@@ -220,6 +229,11 @@ def login_user(user: UserLogin):
     }
 
 
+@app.get("/me", response_model=UserOut)
+def get_me(current_user=Depends(get_current_user)):
+    return serialize_user(current_user)
+
+
 # ---------- Food routes ----------
 @app.get("/foods")
 def get_foods(current_user=Depends(get_current_user)):
@@ -248,7 +262,8 @@ def add_food_log(log: FoodLogCreate, current_user=Depends(get_current_user)):
     log_dict = {
         "user_id": user_id,
         "food_name": log.food_name,
-        "calories": log.calories
+        "calories": log.calories,
+        "created_at": datetime.now(timezone.utc)
     }
 
     result = food_logs_collection.insert_one(log_dict)
@@ -258,10 +273,6 @@ def add_food_log(log: FoodLogCreate, current_user=Depends(get_current_user)):
         raise HTTPException(status_code=500, detail="Food log creation failed")
 
     return serialize_food_log(new_log)
-
-@app.get("/me", response_model=UserOut)
-def get_me(current_user=Depends(get_current_user)):
-    return serialize_user(current_user)
 
 
 # ---------- Exercise routes ----------
@@ -285,7 +296,8 @@ def add_exercise_log(log: ExerciseLogCreate, current_user=Depends(get_current_us
     log_dict = {
         "user_id": user_id,
         "exercise_name": log.exercise_name,
-        "calories_burned": log.calories_burned
+        "calories_burned": log.calories_burned,
+        "created_at": datetime.now(timezone.utc)
     }
 
     result = exercise_logs_collection.insert_one(log_dict)
@@ -295,6 +307,7 @@ def add_exercise_log(log: ExerciseLogCreate, current_user=Depends(get_current_us
         raise HTTPException(status_code=500, detail="Exercise log creation failed")
 
     return serialize_exercise_log(new_log)
+
 
 # ---------- Admin routes ----------
 @app.get("/admin/users", response_model=List[UserSummary])
@@ -308,7 +321,6 @@ def delete_user(user_id: str, current_user=Depends(require_admin)):
     if not ObjectId.is_valid(user_id):
         raise HTTPException(status_code=400, detail="Invalid user ID")
 
-    # Prevent admin from deleting themselves accidentally
     if str(current_user["_id"]) == user_id:
         raise HTTPException(status_code=400, detail="Admins cannot delete themselves")
 
@@ -317,11 +329,11 @@ def delete_user(user_id: str, current_user=Depends(require_admin)):
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="User not found")
 
-    # Optional cleanup of that user's logs
     food_logs_collection.delete_many({"user_id": user_id})
     exercise_logs_collection.delete_many({"user_id": user_id})
 
     return
+
 
 @app.put("/admin/users/{user_id}/role")
 def update_user_role(user_id: str, role_update: UserRoleUpdate, current_user=Depends(require_admin)):
@@ -331,7 +343,6 @@ def update_user_role(user_id: str, role_update: UserRoleUpdate, current_user=Dep
     if role_update.role not in ["user", "admin"]:
         raise HTTPException(status_code=400, detail="Role must be 'user' or 'admin'")
 
-    # Prevent admin from changing their own role and locking themselves out
     if str(current_user["_id"]) == user_id:
         raise HTTPException(status_code=400, detail="Admins cannot change their own role")
 
@@ -345,6 +356,7 @@ def update_user_role(user_id: str, role_update: UserRoleUpdate, current_user=Dep
 
     updated_user = users_collection.find_one({"_id": ObjectId(user_id)})
     return serialize_user(updated_user)
+
 
 # ---------- Static assets ----------
 app.mount("/static", StaticFiles(directory="static"), name="static")
@@ -369,6 +381,7 @@ def login_page():
 @app.get("/tracker")
 def tracker_page():
     return FileResponse("static/index.html")
+
 
 @app.get("/admin")
 def admin_page():
