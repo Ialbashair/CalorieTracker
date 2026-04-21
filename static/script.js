@@ -382,7 +382,6 @@ async function addFoodEntry() {
 
     try {
         const response = await fetch("/food-logs", {
-        const response = await fetch("/food-logs", {
             method: "POST",
             headers: getAuthHeaders(),
             body: JSON.stringify({
