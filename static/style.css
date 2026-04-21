@@ -23,6 +23,7 @@ body {
 
 .container {
     width: 600px;
+    width: 600px;
     background: var(--card);
     padding: 40px;
     border-radius: 12px;
@@ -87,8 +88,41 @@ header h1 {
     margin: 0;
     border: 2px dashed var(--border);
     border-radius: 8px;
+/* Sections */
+.section {
+    margin-bottom: 25px;
 }
 
+.section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 15px;
+}
+
+.section-header h2 {
+    margin: 0;
+    font-size: 1.3rem;
+    color: var(--text);
+}
+
+.add-section-btn {
+    background-color: var(--primary);
+    color: white;
+    padding: 8px 16px;
+}
+
+.empty-label {
+    text-align: center;
+    color: #9ca3af;
+    font-size: 0.95rem;
+    padding: 25px 0;
+    margin: 0;
+    border: 2px dashed var(--border);
+    border-radius: 8px;
+}
+
+/* Inputs & Buttons */
 /* Inputs & Buttons */
 input {
     padding: 12px 15px;
@@ -122,6 +156,12 @@ button:active {
     list-style: none;
     padding: 0;
     margin: 0;
+/* List Items */
+#calorie-list,
+#exercise-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
 }
 
 .item {
@@ -131,6 +171,7 @@ button:active {
     padding: 15px;
     background: #f9fafb;
     border: 1px solid var(--border);
+    border-left: 4px solid var(--primary);
     border-left: 4px solid var(--primary);
     border-radius: 8px;
     margin-bottom: 10px;
@@ -162,7 +203,9 @@ button:active {
 }
 
 /* Modal */
+/* Modal */
 .modal {
+    display: none;
     display: none;
     position: fixed;
     z-index: 100;
@@ -170,6 +213,7 @@ button:active {
     top: 0;
     width: 100%;
     height: 100%;
+    background-color: rgba(0, 0, 0, 0.5);
     background-color: rgba(0, 0, 0, 0.5);
 }
 
@@ -179,6 +223,12 @@ button:active {
     padding: 30px;
     border-radius: 12px;
     width: 400px;
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+
+.modal-content form {
     display: flex;
     flex-direction: column;
     gap: 15px;
@@ -213,6 +263,23 @@ button:active {
     color: white;
     padding: 10px 20px;
 }
+.save-btn {
+    background-color: var(--secondary);
+    color: white;
+    padding: 10px 20px;
+}
+
+.cancel-btn {
+    background-color: var(--danger);
+    color: white;
+    padding: 10px 20px;
+}
+
+.delete-confirm-btn {
+    background-color: var(--danger);
+    color: white;
+    padding: 10px 20px;
+}
 
 .delete-confirm-btn:hover {
     background-color: #dc2626;
@@ -221,8 +288,27 @@ button:active {
 /* Search dropdown */
 .search-wrapper {
     position: relative;
+/* Search dropdown */
+.search-wrapper {
+    position: relative;
 }
 
+.search-dropdown {
+    display: none;
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background: white;
+    border: 2px solid var(--border);
+    border-top: none;
+    border-radius: 0 0 8px 8px;
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    max-height: 200px;
+    overflow-y: auto;
+    z-index: 110;
 .search-dropdown {
     display: none;
     position: absolute;
@@ -245,8 +331,14 @@ button:active {
     padding: 10px 15px;
     cursor: pointer;
     font-size: 0.95rem;
+.search-dropdown li {
+    padding: 10px 15px;
+    cursor: pointer;
+    font-size: 0.95rem;
 }
 
+.search-dropdown li:hover {
+    background-color: var(--bg);
 .search-dropdown li:hover {
     background-color: var(--bg);
     color: var(--primary);

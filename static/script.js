@@ -382,6 +382,7 @@ async function addFoodEntry() {
 
     try {
         const response = await fetch("/food-logs", {
+        const response = await fetch("/food-logs", {
             method: "POST",
             headers: getAuthHeaders(),
             body: JSON.stringify({
@@ -398,12 +399,19 @@ async function addFoodEntry() {
         if (response.ok) {
             closeAddFoodModal();
             loadFoodLogs();
+            closeAddFoodModal();
+            loadFoodLogs();
         } else {
             const data = await response.json();
             errorEl.textContent = data.detail || "Failed to log food.";
             errorEl.style.display = "block";
+            errorEl.textContent = data.detail || "Failed to log food.";
+            errorEl.style.display = "block";
         }
     } catch (error) {
+        console.error("Error logging food:", error);
+        errorEl.textContent = "Something went wrong.";
+        errorEl.style.display = "block";
         console.error("Error logging food:", error);
         errorEl.textContent = "Something went wrong.";
         errorEl.style.display = "block";
@@ -490,6 +498,7 @@ async function openAddExerciseModal() {
             exerciseList = await response.json();
         }
     } catch (error) {
+        console.error("Error fetching exercises:", error);
         console.error("Error fetching exercises:", error);
     }
 
@@ -595,8 +604,12 @@ async function addExerciseEntry() {
         if (response.ok) {
             closeAddExerciseModal();
             loadExerciseLogs();
+            closeAddExerciseModal();
+            loadExerciseLogs();
         } else {
             const data = await response.json();
+            errorEl.textContent = data.detail || "Failed to log exercise.";
+            errorEl.style.display = "block";
             errorEl.textContent = data.detail || "Failed to log exercise.";
             errorEl.style.display = "block";
         }
