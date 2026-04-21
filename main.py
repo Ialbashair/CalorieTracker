@@ -1,67 +1,107 @@
 # ---------- Imports ----------
-from fastapi import FastAPI, HTTPException, status
-from pydantic import BaseModel
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from datetime import datetime, timedelta, timezone
+from typing import List, Optional
+from fastapi import FastAPI, HTTPException, status, Depends
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, RedirectResponse
-from typing import List, Optional
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from jose import JWTError, jwt
+from passlib.context import CryptContext
+from pydantic import BaseModel
+from pydantic_settings import BaseSettings, SettingsConfigDict
 from pymongo import MongoClient
 from bson import ObjectId
-from passlib.context import CryptContext
 
-# ---------- Initialize app ----------
 app = FastAPI()
 
-# Debug print to confirm the correct file is running
-print("MAIN.PY LOADED", flush=True)
-
-# ---------- MongoDB setup ----------
-class MongoDBSettings(BaseSettings):
-    url: str = ""
+# ---------- Settings ----------
+class AppSettings(BaseSettings):
+    mongo_url: str = ""
+    secret_key: str = ""
+    algorithm: str = "HS256"
+    access_token_expire_minutes: int = 60
 
     model_config = SettingsConfigDict(env_file="./.env")
 
-MONGO_URL = MongoDBSettings().url
 
-client = MongoClient(MONGO_URL)
+settings = AppSettings()
+
+# ---------- MongoDB setup ----------
+client = MongoClient(settings.mongo_url)
 database = client["Nutri"]
 
-# Collections
-entries_collection = database["Food_logs"]
 users_collection = database["User_Info"]
+foods_collection = database["Foods"]
+food_logs_collection = database["Food_logs"]
+exercises_collection = database["Exercises"]
+exercise_logs_collection = database["Exercise_logs"]
 
-print("Connected to database:", database.name, flush=True)
-print("Entries collection:", entries_collection.name, flush=True)
-print("Users collection:", users_collection.name, flush=True)
-
-# ---------- Password hashing ----------
+# ---------- Security ----------
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+bearer_scheme = HTTPBearer(auto_error=False)
+
 
 def hash_password(password: str) -> str:
-    print("hash_password() called", flush=True)
     return pwd_context.hash(password)
 
+
 def verify_password(plain_password: str, hashed_password: str) -> bool:
-    print("verify_password() called", flush=True)
     return pwd_context.verify(plain_password, hashed_password)
 
-# ---------- Pydantic models ----------
-# Temporarily using plain str for email while debugging.
-# Once auth works, you can switch email back to EmailStr.
-class CalorieEntry(BaseModel):
-    id: Optional[str] = None
-    user_id: str
-    food_name: str
-    calories: int
 
+def create_access_token(user_id: str) -> str:
+    expire = datetime.now(timezone.utc) + timedelta(minutes=settings.access_token_expire_minutes)
+    payload = {
+        "sub": user_id,
+        "exp": expire
+    }
+    return jwt.encode(payload, settings.secret_key, algorithm=settings.algorithm)
+
+
+def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(bearer_scheme)):
+    if credentials is None:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+
+    token = credentials.credentials
+
+    try:
+        payload = jwt.decode(token, settings.secret_key, algorithms=[settings.algorithm])
+        user_id = payload.get("sub")
+
+        if not user_id:
+            raise HTTPException(status_code=401, detail="Invalid token")
+
+        if not ObjectId.is_valid(user_id):
+            raise HTTPException(status_code=401, detail="Invalid user ID in token")
+
+        user = users_collection.find_one({"_id": ObjectId(user_id)})
+
+        if not user:
+            raise HTTPException(status_code=401, detail="User not found")
+
+        return user
+
+    except JWTError:
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
+
+
+def require_admin(current_user=Depends(get_current_user)):
+    if current_user.get("role") != "admin":
+        raise HTTPException(status_code=403, detail="Admin access required")
+    return current_user
+
+
+# ---------- Pydantic models ----------
 class UserCreate(BaseModel):
     username: str
     email: str
     password: str
 
+
 class UserLogin(BaseModel):
     email: str
     password: str
+
 
 class UserOut(BaseModel):
     id: str
@@ -69,15 +109,51 @@ class UserOut(BaseModel):
     email: str
     role: str
 
-# ---------- Helper functions ----------
-def serialize_entry(entry) -> dict:
-    return {
-        "id": str(entry["_id"]),
-        "user_id": entry["user_id"],
-        "food_name": entry["food_name"],
-        "calories": entry["calories"]
-    }
 
+class UserRoleUpdate(BaseModel):
+    role: str
+
+
+class TokenResponse(BaseModel):
+    access_token: str
+    token_type: str
+    user: UserOut
+
+
+class FoodLog(BaseModel):
+    id: Optional[str] = None
+    user_id: str
+    food_name: str
+    calories: int
+    created_at: Optional[str] = None
+
+
+class FoodLogCreate(BaseModel):
+    food_name: str
+    calories: int
+
+
+class ExerciseLog(BaseModel):
+    id: Optional[str] = None
+    user_id: str
+    exercise_name: str
+    calories_burned: int
+    created_at: Optional[str] = None
+
+
+class ExerciseLogCreate(BaseModel):
+    exercise_name: str
+    calories_burned: int
+
+
+class UserSummary(BaseModel):
+    id: str
+    username: str
+    email: str
+    role: str
+
+
+# ---------- Helper functions ----------
 def serialize_user(user) -> dict:
     return {
         "id": str(user["_id"]),
@@ -85,6 +161,27 @@ def serialize_user(user) -> dict:
         "email": user["email"],
         "role": user["role"]
     }
+
+
+def serialize_food_log(log) -> dict:
+    return {
+        "id": str(log["_id"]),
+        "user_id": log["user_id"],
+        "food_name": log["food_name"],
+        "calories": log["calories"],
+        "created_at": log["created_at"].isoformat() if "created_at" in log and log["created_at"] else None
+    }
+
+
+def serialize_exercise_log(log) -> dict:
+    return {
+        "id": str(log["_id"]),
+        "user_id": log["user_id"],
+        "exercise_name": log["exercise_name"],
+        "calories_burned": log["calories_burned"],
+        "created_at": log["created_at"].isoformat() if "created_at" in log and log["created_at"] else None
+    }
+
 
 # ---------- Auth routes ----------
 @app.post("/register", response_model=UserOut, status_code=status.HTTP_201_CREATED)
@@ -113,156 +210,179 @@ def register_user(user: UserCreate):
     return serialize_user(new_user)
 
 
-@app.post("/login")
+@app.post("/login", response_model=TokenResponse)
 def login_user(user: UserLogin):
-    print("LOGIN ROUTE HIT", flush=True)
-    print("Incoming login payload:", user.model_dump(), flush=True)
+    existing_user = users_collection.find_one({"email": user.email})
 
-    try:
-        existing_user = users_collection.find_one({"email": user.email})
-        print("Login email lookup complete", flush=True)
+    if not existing_user:
+        raise HTTPException(status_code=401, detail="Invalid email or password")
 
-        if not existing_user:
-            print("No user found for that email", flush=True)
-            raise HTTPException(status_code=401, detail="Invalid email or password")
+    if not verify_password(user.password, existing_user["password"]):
+        raise HTTPException(status_code=401, detail="Invalid email or password")
 
-        password_ok = verify_password(user.password, existing_user["password"])
-        print("Password verification result:", password_ok, flush=True)
+    access_token = create_access_token(str(existing_user["_id"]))
 
-        if not password_ok:
-            raise HTTPException(status_code=401, detail="Invalid email or password")
+    return {
+        "access_token": access_token,
+        "token_type": "bearer",
+        "user": serialize_user(existing_user)
+    }
 
-        print("Login successful", flush=True)
-        return {
-            "message": "Login successful",
-            "user": serialize_user(existing_user)
+
+@app.get("/me", response_model=UserOut)
+def get_me(current_user=Depends(get_current_user)):
+    return serialize_user(current_user)
+
+
+# ---------- Food routes ----------
+@app.get("/foods")
+def get_foods(current_user=Depends(get_current_user)):
+    foods = foods_collection.find({}, {"_id": 0, "name": 1, "calories": 1, "serving_size_g": 1})
+    return [
+        {
+            "name": f["name"],
+            "calories": f["calories"],
+            "serving_size_g": f["serving_size_g"]
         }
+        for f in foods
+    ]
 
-    except HTTPException:
-        raise
-    except Exception as e:
-        print("LOGIN ERROR:", repr(e), flush=True)
-        raise HTTPException(status_code=500, detail=f"Login failed: {repr(e)}")
 
-# ---------- Calorie entry routes ----------
-@app.get("/entries/{user_id}", response_model=List[CalorieEntry])
-def get_user_entries(user_id: str):
-    entries = entries_collection.find({"user_id": user_id})
-    return [serialize_entry(entry) for entry in entries]
+@app.get("/food-logs", response_model=List[FoodLog])
+def get_food_logs(current_user=Depends(get_current_user)):
+    user_id = str(current_user["_id"])
+    logs = food_logs_collection.find({"user_id": user_id})
+    return [serialize_food_log(log) for log in logs]
 
-@app.post("/entries", response_model=CalorieEntry, status_code=status.HTTP_201_CREATED)
-def add_entry(entry: CalorieEntry):
-    print("POST /entries hit", flush=True)
-    print("Incoming entry payload:", entry.model_dump(), flush=True)
 
-    try:
-        entry_dict = {
-            "user_id": entry.user_id,
-            "food_name": entry.food_name,
-            "calories": entry.calories
-        }
+@app.post("/food-logs", response_model=FoodLog, status_code=status.HTTP_201_CREATED)
+def add_food_log(log: FoodLogCreate, current_user=Depends(get_current_user)):
+    user_id = str(current_user["_id"])
 
-        result = entries_collection.insert_one(entry_dict)
-        print("Inserted entry ID:", result.inserted_id, flush=True)
+    log_dict = {
+        "user_id": user_id,
+        "food_name": log.food_name,
+        "calories": log.calories,
+        "created_at": datetime.now(timezone.utc)
+    }
 
-        new_entry = entries_collection.find_one({"_id": result.inserted_id})
-        print("Fetched inserted entry:", new_entry, flush=True)
+    result = food_logs_collection.insert_one(log_dict)
+    new_log = food_logs_collection.find_one({"_id": result.inserted_id})
 
-        return serialize_entry(new_entry)
+    if not new_log:
+        raise HTTPException(status_code=500, detail="Food log creation failed")
 
-    except Exception as e:
-        print("ADD ENTRY ERROR:", repr(e), flush=True)
-        raise HTTPException(status_code=500, detail=f"Add entry failed: {repr(e)}")
+    return serialize_food_log(new_log)
 
-@app.put("/entries/{entry_id}/{user_id}", response_model=CalorieEntry)
-def update_entry(entry_id: str, user_id: str, updated_item: CalorieEntry):
-    print(f"PUT /entries/{entry_id} hit", flush=True)
-    print("Incoming updated item:", updated_item.model_dump(), flush=True)
 
-    try:
-        if not ObjectId.is_valid(entry_id):
-            print("Invalid ObjectId for update", flush=True)
-            raise HTTPException(status_code=400, detail="Invalid entry ID")
+# ---------- Exercise routes ----------
+@app.get("/exercises")
+def get_exercises(current_user=Depends(get_current_user)):
+    exercises = exercises_collection.find({}, {"_id": 0, "name": 1, "calories_per_hour": 1})
+    return [{"name": e["name"], "calories_per_hour": e["calories_per_hour"]} for e in exercises]
 
-        result = entries_collection.update_one(
-            {
-                "_id": ObjectId(entry_id),
-                "user_id": user_id
-            },
-            {
-                "$set": {
-                    "food_name": updated_item.food_name,
-                    "calories": updated_item.calories
-                }
-            }
-        )
 
-        print("Matched count:", result.matched_count, flush=True)
-        print("Modified count:", result.modified_count, flush=True)
+@app.get("/exercise-logs", response_model=List[ExerciseLog])
+def get_exercise_logs(current_user=Depends(get_current_user)):
+    user_id = str(current_user["_id"])
+    logs = exercise_logs_collection.find({"user_id": user_id})
+    return [serialize_exercise_log(log) for log in logs]
 
-        if result.matched_count == 0:
-            raise HTTPException(status_code=404, detail="Item not found")
 
-        updated_entry = entries_collection.find_one({
-            "_id": ObjectId(entry_id),
-            "user_id": user_id
-        })
-        print("Fetched updated entry:", updated_entry, flush=True)
+@app.post("/exercise-logs", response_model=ExerciseLog, status_code=status.HTTP_201_CREATED)
+def add_exercise_log(log: ExerciseLogCreate, current_user=Depends(get_current_user)):
+    user_id = str(current_user["_id"])
 
-        return serialize_entry(updated_entry)
+    log_dict = {
+        "user_id": user_id,
+        "exercise_name": log.exercise_name,
+        "calories_burned": log.calories_burned,
+        "created_at": datetime.now(timezone.utc)
+    }
 
-    except HTTPException:
-        raise
-    except Exception as e:
-        print("UPDATE ENTRY ERROR:", repr(e), flush=True)
-        raise HTTPException(status_code=500, detail=f"Update failed: {repr(e)}")
+    result = exercise_logs_collection.insert_one(log_dict)
+    new_log = exercise_logs_collection.find_one({"_id": result.inserted_id})
 
-@app.delete("/entries/{entry_id}/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_entry(entry_id: str, user_id: str):
-    print(f"DELETE /entries/{entry_id} hit", flush=True)
+    if not new_log:
+        raise HTTPException(status_code=500, detail="Exercise log creation failed")
 
-    try:
-        if not ObjectId.is_valid(entry_id):
-            print("Invalid ObjectId for delete", flush=True)
-            raise HTTPException(status_code=400, detail="Invalid entry ID")
+    return serialize_exercise_log(new_log)
 
-        result = entries_collection.delete_one({
-            "_id": ObjectId(entry_id),
-            "user_id": user_id
-        })
 
-        print("Deleted count:", result.deleted_count, flush=True)
+# ---------- Admin routes ----------
+@app.get("/admin/users", response_model=List[UserSummary])
+def get_all_users(current_user=Depends(require_admin)):
+    users = users_collection.find()
+    return [serialize_user(user) for user in users]
 
-        if result.deleted_count == 0:
-            raise HTTPException(status_code=404, detail="Item not found")
 
-        return
+@app.delete("/admin/users/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_user(user_id: str, current_user=Depends(require_admin)):
+    if not ObjectId.is_valid(user_id):
+        raise HTTPException(status_code=400, detail="Invalid user ID")
 
-    except HTTPException:
-        raise
-    except Exception as e:
-        print("DELETE ENTRY ERROR:", repr(e), flush=True)
-        raise HTTPException(status_code=500, detail=f"Delete failed: {repr(e)}")
+    if str(current_user["_id"]) == user_id:
+        raise HTTPException(status_code=400, detail="Admins cannot delete themselves")
+
+    result = users_collection.delete_one({"_id": ObjectId(user_id)})
+
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    food_logs_collection.delete_many({"user_id": user_id})
+    exercise_logs_collection.delete_many({"user_id": user_id})
+
+    return
+
+
+@app.put("/admin/users/{user_id}/role")
+def update_user_role(user_id: str, role_update: UserRoleUpdate, current_user=Depends(require_admin)):
+    if not ObjectId.is_valid(user_id):
+        raise HTTPException(status_code=400, detail="Invalid user ID")
+
+    if role_update.role not in ["user", "admin"]:
+        raise HTTPException(status_code=400, detail="Role must be 'user' or 'admin'")
+
+    if str(current_user["_id"]) == user_id:
+        raise HTTPException(status_code=400, detail="Admins cannot change their own role")
+
+    result = users_collection.update_one(
+        {"_id": ObjectId(user_id)},
+        {"$set": {"role": role_update.role}}
+    )
+
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    updated_user = users_collection.find_one({"_id": ObjectId(user_id)})
+    return serialize_user(updated_user)
+
+
 # ---------- Static assets ----------
 app.mount("/static", StaticFiles(directory="static"), name="static")
+
 
 # ---------- Page routes ----------
 @app.get("/")
 def root():
-    print("GET / hit -> redirecting to /login", flush=True)
     return RedirectResponse(url="/login")
+
 
 @app.get("/register")
 def register_page():
-    print("GET /register page route hit", flush=True)
     return FileResponse("static/register.html")
+
 
 @app.get("/login")
 def login_page():
-    print("GET /login page route hit", flush=True)
     return FileResponse("static/login.html")
+
 
 @app.get("/tracker")
 def tracker_page():
-    print("GET /tracker page route hit", flush=True)
     return FileResponse("static/index.html")
+
+
+@app.get("/admin")
+def admin_page():
+    return FileResponse("static/admin.html")

@@ -43,14 +43,16 @@
     <div id="add-food-modal" class="modal">
         <div class="modal-content">
             <h3>Add Food</h3>
-            <form id="calorie-form" onsubmit="event.preventDefault(); addEntry();">
-                <input type="text" id="food-name" placeholder="Food Name" required>
-                <input type="number" id="calories" placeholder="Calories" min="1" required>
-                <div class="modal-actions">
-                    <button type="submit" class="save-btn">Add</button>
-                    <button type="button" onclick="closeAddFoodModal()" class="cancel-btn">Cancel</button>
-                </div>
-            </form>
+            <p id="food-error" style="color: #ef4444; display: none; font-size: 0.8rem; margin-bottom: 10px;"></p>
+            <div class="search-wrapper">
+                <input type="text" id="food-search" placeholder="Search foods..." autocomplete="off">
+                <ul id="food-results" class="search-dropdown"></ul>
+            </div>
+            <input type="text" inputmode="decimal" id="food-grams" placeholder="Grams" oninput="limitDecimals(this, 2)">
+            <div class="modal-actions">
+                <button onclick="addFoodEntry()" class="save-btn">Add</button>
+                <button onclick="closeAddFoodModal()" class="cancel-btn">Cancel</button>
+            </div>
         </div>
     </div>
 
@@ -67,34 +69,6 @@
             <div class="modal-actions">
                 <button onclick="addExerciseEntry()" class="save-btn">Add</button>
                 <button onclick="closeAddExerciseModal()" class="cancel-btn">Cancel</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Edit Food Modal -->
-    <div id="edit-modal" class="modal">
-        <div class="modal-content">
-            <h3>Edit Entry</h3>
-            <p id="edit-error" style="color: #ef4444; display: none; font-size: 0.8rem; margin-bottom: 10px;"></p>
-            <input type="hidden" id="edit-id">
-            <input type="text" id="edit-food-name" placeholder="Food Name" required>
-            <input type="number" id="edit-calories" placeholder="Calories" min="1" required>
-            <div class="modal-actions">
-                <button onclick="saveEdit()" class="save-btn">Save Changes</button>
-                <button onclick="closeModal()" class="cancel-btn">Cancel</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Delete Confirmation Modal -->
-    <div id="delete-modal" class="modal">
-        <div class="modal-content">
-            <h3>Confirm Delete</h3>
-            <p>Are you sure you want to remove this entry? This action cannot be undone.</p>
-            <input type="hidden" id="delete-id">
-            <div class="modal-actions">
-                <button onclick="confirmDelete()" class="delete-confirm-btn">Delete</button>
-                <button onclick="closeDeleteModal()" class="cancel-btn">Cancel</button>
             </div>
         </div>
     </div>
