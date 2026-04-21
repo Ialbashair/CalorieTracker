@@ -1,37 +1,62 @@
 console.log("SCRIPT.JS LOADED");
 
-const API_URL = "/entries";
 const REGISTER_URL = "/register";
 const LOGIN_URL = "/login";
+let adminUsers = [];
 
 // Run page-specific setup
-window.onload = () => {
-    console.log("js loaded");
+window.onload = async () => {
     setupRegisterForm();
     setupLoginForm();
-    setupCaloriePage();
+    await setupCaloriePage();
+    await setupAdminPage();
 };
+
+// ---------- Auth helpers ----------
+function getCurrentUser() {
+    const userData = localStorage.getItem("nutriUser");
+    return userData ? JSON.parse(userData) : null;
+}
+
+function getToken() {
+    return localStorage.getItem("nutriToken");
+}
+
+function getAuthHeaders(includeJson = true) {
+    const token = getToken();
+    const headers = {};
+
+    if (includeJson) {
+        headers["Content-Type"] = "application/json";
+    }
+
+    if (token) {
+        headers["Authorization"] = `Bearer ${token}`;
+    }
+
+    return headers;
+}
+
+function logoutUser() {
+    localStorage.removeItem("nutriUser");
+    localStorage.removeItem("nutriToken");
+    window.location.href = "/login";
+}
 
 // ---------- Register ----------
 function setupRegisterForm() {
     const registerForm = document.getElementById("register-form");
     if (!registerForm) return;
 
-    console.log("Register form found");
-
     registerForm.addEventListener("submit", async (event) => {
         event.preventDefault();
-        console.log("Register form submitted");
 
         const usernameInput = document.getElementById("register-username");
         const emailInput = document.getElementById("register-email");
         const passwordInput = document.getElementById("register-password");
         const message = document.getElementById("register-message");
 
-        if (!usernameInput || !emailInput || !passwordInput || !message) {
-            console.error("Register page elements missing");
-            return;
-        }
+        if (!usernameInput || !emailInput || !passwordInput || !message) return;
 
         const username = usernameInput.value.trim();
         const email = emailInput.value.trim();
@@ -41,15 +66,10 @@ function setupRegisterForm() {
             const response = await fetch(REGISTER_URL, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    username,
-                    email,
-                    password
-                })
+                body: JSON.stringify({ username, email, password })
             });
 
             const data = await response.json();
-            console.log("Register response:", data);
 
             if (response.ok) {
                 message.textContent = "Registration successful. Redirecting to login...";
@@ -75,20 +95,14 @@ function setupLoginForm() {
     const loginForm = document.getElementById("login-form");
     if (!loginForm) return;
 
-    console.log("Login form found");
-
     loginForm.addEventListener("submit", async (event) => {
         event.preventDefault();
-        console.log("Login form submitted");
 
         const emailInput = document.getElementById("login-email");
         const passwordInput = document.getElementById("login-password");
         const message = document.getElementById("login-message");
 
-        if (!emailInput || !passwordInput || !message) {
-            console.error("Login page elements missing");
-            return;
-        }
+        if (!emailInput || !passwordInput || !message) return;
 
         const email = emailInput.value.trim();
         const password = passwordInput.value.trim();
@@ -97,17 +111,14 @@ function setupLoginForm() {
             const response = await fetch(LOGIN_URL, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    email,
-                    password
-                })
+                body: JSON.stringify({ email, password })
             });
 
             const data = await response.json();
-            console.log("Login response:", data);
 
             if (response.ok) {
                 localStorage.setItem("nutriUser", JSON.stringify(data.user));
+                localStorage.setItem("nutriToken", data.access_token);
 
                 message.textContent = "Login successful. Redirecting...";
                 message.style.color = "green";
@@ -128,39 +139,43 @@ function setupLoginForm() {
 }
 
 // ---------- Tracker page ----------
-function setupCaloriePage() {
+async function setupCaloriePage() {
     const calorieList = document.getElementById("calorie-list");
     const totalDisplay = document.getElementById("total-calories");
 
-    // If tracker-only elements are not on the page, stop here
     if (!calorieList || !totalDisplay) return;
 
-    console.log("Tracker page detected");
+    let currentUser = getCurrentUser();
+    const token = getToken();
 
-    const currentUser = getCurrentUser();
-
-    // If user is not logged in, redirect away from tracker
-    if (!currentUser) {
+    if (!token) {
         window.location.href = "/login";
         return;
     }
 
+    currentUser = await fetchCurrentUserFromToken();
+
+    if (!currentUser) {
+        logoutUser();
+        return;
+    }
+
     renderUserHeader(currentUser);
-    loadCalories();
-}
-
-function getCurrentUser() {
-    const userData = localStorage.getItem("nutriUser");
-    return userData ? JSON.parse(userData) : null;
-}
-
-function logoutUser() {
-    localStorage.removeItem("nutriUser");
-    window.location.href = "/login";
+    loadFoodLogs();
+    loadExerciseLogs();
 }
 
 function renderUserHeader(user) {
     const header = document.querySelector("header");
+
+    const isAdminPage = window.location.pathname === "/admin";
+
+    const navLink = user.role === "admin"
+        ? isAdminPage
+            ? `<a href="/tracker" style="font-weight:600;">Tracker</a>`
+            : `<a href="/admin" style="font-weight:600;">Admin</a>`
+        : "";
+
     if (!header || !user) return;
 
     let userBar = document.getElementById("user-bar");
@@ -178,187 +193,585 @@ function renderUserHeader(user) {
     }
 
     userBar.innerHTML = `
-        <span>Logged in as <strong>${escapeHtml(user.username)}</strong></span>
+    <span>Logged in as <strong>${escapeHtml(user.username)}</strong> (${escapeHtml(user.role)})</span>
+    <div style="display:flex; gap:10px; align-items:center;">
+        ${navLink}
         <button onclick="logoutUser()">Logout</button>
+    </div>
     `;
 }
 
-// ---------- Calories CRUD ----------
-async function loadCalories() {
-    const listElement = document.getElementById("calorie-list");
-    const totalDisplay = document.getElementById("total-calories");
-
-    // Prevent running on login/register pages
-    if (!listElement || !totalDisplay) return;
-
+// ---------- Food Section ----------
+async function loadFoodLogs() {
     try {
-        const response = await fetch(API_URL);
+        const response = await fetch("/food-logs", {
+            headers: getAuthHeaders(false)
+        });
+
+        if (response.status === 401) {
+            logoutUser();
+            return;
+        }
+
         const data = await response.json();
-        renderList(data);
+        renderFoodList(data);
     } catch (error) {
-        console.error("Error fetching data:", error);
+        console.error("Error fetching food logs:", error);
     }
 }
 
-async function addEntry() {
-    const nameInput = document.getElementById("food-name");
-    const calInput = document.getElementById("calories");
-
-    if (!nameInput || !calInput) return;
-
-    const newEntry = {
-        food_name: nameInput.value.trim(),
-        calories: parseInt(calInput.value)
-    };
-
-    try {
-        const response = await fetch(API_URL, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(newEntry)
-        });
-
-        if (response.ok) {
-            nameInput.value = "";
-            calInput.value = "";
-            loadCalories();
-        } else {
-            const data = await response.json();
-            console.error("Add entry failed:", data);
-        }
-    } catch (error) {
-        console.error("Error adding entry:", error);
-    }
-}
-
-function openDeleteModal(id) {
-    const deleteIdInput = document.getElementById("delete-id");
-    const deleteModal = document.getElementById("delete-modal");
-
-    if (!deleteIdInput || !deleteModal) return;
-
-    deleteIdInput.value = id;
-    deleteModal.style.display = "block";
-}
-
-function closeDeleteModal() {
-    const deleteModal = document.getElementById("delete-modal");
-    if (!deleteModal) return;
-
-    deleteModal.style.display = "none";
-}
-
-async function confirmDelete() {
-    const deleteIdInput = document.getElementById("delete-id");
-    if (!deleteIdInput) return;
-
-    const id = deleteIdInput.value;
-
-    try {
-        const res = await fetch(`${API_URL}/${id}`, {
-            method: "DELETE"
-        });
-
-        if (res.ok) {
-            closeDeleteModal();
-            loadCalories();
-        } else {
-            const data = await res.json();
-            console.error("Delete failed:", data);
-        }
-    } catch (error) {
-        console.error("Delete failed:", error);
-    }
-}
-
-function openEditModal(id, name, calories) {
-    const editId = document.getElementById("edit-id");
-    const editFoodName = document.getElementById("edit-food-name");
-    const editCalories = document.getElementById("edit-calories");
-    const editModal = document.getElementById("edit-modal");
-
-    if (!editId || !editFoodName || !editCalories || !editModal) return;
-
-    editId.value = id;
-    editFoodName.value = name;
-    editCalories.value = calories;
-    editModal.style.display = "block";
-}
-
-function closeModal() {
-    const editModal = document.getElementById("edit-modal");
-    if (!editModal) return;
-
-    editModal.style.display = "none";
-}
-
-async function saveEdit() {
-    const editId = document.getElementById("edit-id");
-    const editFoodName = document.getElementById("edit-food-name");
-    const editCalories = document.getElementById("edit-calories");
-
-    if (!editId || !editFoodName || !editCalories) return;
-
-    const id = editId.value;
-    const name = editFoodName.value.trim();
-    const calories = editCalories.value;
-
-    const updatedData = {
-        food_name: name,
-        calories: parseInt(calories)
-    };
-
-    try {
-        const response = await fetch(`${API_URL}/${id}`, {
-            method: "PUT",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(updatedData)
-        });
-
-        if (response.ok) {
-            closeModal();
-            loadCalories();
-        } else {
-            const data = await response.json();
-            console.error("Update failed:", data);
-        }
-    } catch (error) {
-        console.error("Error updating entry:", error);
-    }
-}
-
-function renderList(entries) {
+function renderFoodList(logs) {
     const listElement = document.getElementById("calorie-list");
     const totalDisplay = document.getElementById("total-calories");
+    const emptyLabel = document.getElementById("food-empty");
 
-    // Prevent running on login/register pages
-    if (!listElement || !totalDisplay) return;
+    if (!listElement || !totalDisplay || !emptyLabel) return;
 
     listElement.innerHTML = "";
     let total = 0;
 
-    entries.forEach(item => {
-        total += item.calories;
+    if (logs.length === 0) {
+        emptyLabel.style.display = "block";
+    } else {
+        emptyLabel.style.display = "none";
+    }
+
+    logs.forEach(log => {
+        total += log.calories;
 
         const li = document.createElement("li");
         li.className = "item";
 
-        const safeName = escapeHtml(item.food_name);
+        const itemInfo = document.createElement("div");
+        itemInfo.className = "item-info";
+        const strong = document.createElement("strong");
+        strong.textContent = escapeHtml(log.food_name);
+        itemInfo.appendChild(strong);
+        itemInfo.append(` - ${log.calories} kcal`);
+
+        li.appendChild(itemInfo);
+        listElement.appendChild(li);
+    });
+
+    totalDisplay.innerText = total;
+}
+
+let foodList = [];
+let selectedFood = null;
+
+async function openAddFoodModal() {
+    document.getElementById("add-food-modal").style.display = "block";
+
+    try {
+        const response = await fetch("/foods", {
+            headers: getAuthHeaders(false)
+        });
+
+        if (response.status === 401) {
+            logoutUser();
+            return;
+        }
+
+        if (response.ok) {
+            foodList = await response.json();
+        }
+    } catch (error) {
+        console.error("Error fetching foods:", error);
+    }
+
+    const searchInput = document.getElementById("food-search");
+    searchInput.focus();
+    searchInput.oninput = () => filterFoodSearch(searchInput.value);
+}
+
+function filterFoodSearch(query) {
+    const resultsEl = document.getElementById("food-results");
+    resultsEl.innerHTML = "";
+    selectedFood = null;
+
+    if (!query.trim()) {
+        resultsEl.style.display = "none";
+        return;
+    }
+
+    const lower = query.toLowerCase();
+    const matches = foodList.filter(f => f.name.toLowerCase().includes(lower));
+
+    if (matches.length === 0) {
+        resultsEl.style.display = "none";
+        return;
+    }
+
+    matches.forEach(f => {
+        const li = document.createElement("li");
+        li.textContent = f.name;
+        li.onclick = () => {
+            document.getElementById("food-search").value = f.name;
+            selectedFood = f;
+            resultsEl.innerHTML = "";
+            resultsEl.style.display = "none";
+        };
+        resultsEl.appendChild(li);
+    });
+
+    resultsEl.style.display = "block";
+}
+
+function closeAddFoodModal() {
+    document.getElementById("add-food-modal").style.display = "none";
+    document.getElementById("food-search").value = "";
+    document.getElementById("food-grams").value = "";
+    document.getElementById("food-error").style.display = "none";
+    document.getElementById("food-results").innerHTML = "";
+    document.getElementById("food-results").style.display = "none";
+    foodList = [];
+    selectedFood = null;
+}
+
+async function addFoodEntry() {
+    const gramsInput = document.getElementById("food-grams").value.trim();
+    const errorEl = document.getElementById("food-error");
+
+    errorEl.style.display = "none";
+
+    if (!selectedFood) {
+        errorEl.textContent = "Please select a food from the list.";
+        errorEl.style.display = "block";
+        return;
+    }
+
+    if (!gramsInput) {
+        errorEl.textContent = "Please enter the amount in grams.";
+        errorEl.style.display = "block";
+        return;
+    }
+
+    const grams = parseFloat(gramsInput);
+
+    if (isNaN(grams) || grams <= 0) {
+        errorEl.textContent = "Grams must be a positive number.";
+        errorEl.style.display = "block";
+        return;
+    }
+
+    const decimalParts = gramsInput.split(".");
+    if (decimalParts.length === 2 && decimalParts[1].length > 2) {
+        errorEl.textContent = "Grams can have at most 2 decimal places (e.g. 0.25).";
+        errorEl.style.display = "block";
+        return;
+    }
+
+    const calories = Math.round((selectedFood.calories / selectedFood.serving_size_g) * grams);
+
+    try {
+        const response = await fetch("/food-logs", {
+            method: "POST",
+            headers: getAuthHeaders(),
+            body: JSON.stringify({
+                food_name: selectedFood.name,
+                calories: calories
+            })
+        });
+
+        if (response.status === 401) {
+            logoutUser();
+            return;
+        }
+
+        if (response.ok) {
+            closeAddFoodModal();
+            loadFoodLogs();
+        } else {
+            const data = await response.json();
+            errorEl.textContent = data.detail || "Failed to log food.";
+            errorEl.style.display = "block";
+        }
+    } catch (error) {
+        console.error("Error logging food:", error);
+        errorEl.textContent = "Something went wrong.";
+        errorEl.style.display = "block";
+    }
+}
+
+// ---------- Exercise Section ----------
+async function loadExerciseLogs() {
+    try {
+        const response = await fetch("/exercise-logs", {
+            headers: getAuthHeaders(false)
+        });
+
+        if (response.status === 401) {
+            logoutUser();
+            return;
+        }
+
+        const data = await response.json();
+        renderExerciseList(data);
+    } catch (error) {
+        console.error("Error fetching exercise logs:", error);
+    }
+}
+
+function renderExerciseList(logs) {
+    const listElement = document.getElementById("exercise-list");
+    const emptyLabel = document.getElementById("exercise-empty");
+    if (!listElement || !emptyLabel) return;
+
+    listElement.innerHTML = "";
+
+    if (logs.length === 0) {
+        emptyLabel.style.display = "block";
+    } else {
+        emptyLabel.style.display = "none";
+    }
+
+    logs.forEach(log => {
+        const li = document.createElement("li");
+        li.className = "item";
+
+        const itemInfo = document.createElement("div");
+        itemInfo.className = "item-info";
+        const strong = document.createElement("strong");
+        strong.textContent = escapeHtml(log.exercise_name);
+        itemInfo.appendChild(strong);
+        itemInfo.append(` - ${log.calories_burned} kcal burned`);
+
+        li.appendChild(itemInfo);
+        listElement.appendChild(li);
+    });
+}
+
+function limitDecimals(input, maxPlaces) {
+    input.value = input.value.replace(/[^0-9.]/g, "");
+    const parts = input.value.split(".");
+    if (parts.length > 2) {
+        input.value = parts[0] + "." + parts.slice(1).join("");
+    }
+    const cleanParts = input.value.split(".");
+    if (cleanParts.length === 2 && cleanParts[1].length > maxPlaces) {
+        input.value = cleanParts[0] + "." + cleanParts[1].slice(0, maxPlaces);
+    }
+}
+
+let exerciseList = [];
+let selectedExercise = null;
+
+async function openAddExerciseModal() {
+    document.getElementById("add-exercise-modal").style.display = "block";
+
+    try {
+        const response = await fetch("/exercises", {
+            headers: getAuthHeaders(false)
+        });
+
+        if (response.status === 401) {
+            logoutUser();
+            return;
+        }
+
+        if (response.ok) {
+            exerciseList = await response.json();
+        }
+    } catch (error) {
+        console.error("Error fetching exercises:", error);
+    }
+
+    const searchInput = document.getElementById("exercise-search");
+    searchInput.focus();
+    searchInput.oninput = () => filterExerciseSearch(searchInput.value);
+}
+
+function filterExerciseSearch(query) {
+    const resultsEl = document.getElementById("exercise-results");
+    resultsEl.innerHTML = "";
+    selectedExercise = null;
+
+    if (!query.trim()) {
+        resultsEl.style.display = "none";
+        return;
+    }
+
+    const lower = query.toLowerCase();
+    const matches = exerciseList.filter(ex => ex.name.toLowerCase().includes(lower));
+
+    if (matches.length === 0) {
+        resultsEl.style.display = "none";
+        return;
+    }
+
+    matches.forEach(ex => {
+        const li = document.createElement("li");
+        li.textContent = ex.name;
+        li.onclick = () => {
+            document.getElementById("exercise-search").value = ex.name;
+            selectedExercise = ex;
+            resultsEl.innerHTML = "";
+            resultsEl.style.display = "none";
+        };
+        resultsEl.appendChild(li);
+    });
+
+    resultsEl.style.display = "block";
+}
+
+function closeAddExerciseModal() {
+    document.getElementById("add-exercise-modal").style.display = "none";
+    document.getElementById("exercise-search").value = "";
+    document.getElementById("exercise-hours").value = "";
+    document.getElementById("exercise-error").style.display = "none";
+    document.getElementById("exercise-results").innerHTML = "";
+    document.getElementById("exercise-results").style.display = "none";
+    exerciseList = [];
+    selectedExercise = null;
+}
+
+async function addExerciseEntry() {
+    const hoursInput = document.getElementById("exercise-hours").value.trim();
+    const errorEl = document.getElementById("exercise-error");
+
+    errorEl.style.display = "none";
+
+    if (!selectedExercise) {
+        errorEl.textContent = "Please select an exercise from the list.";
+        errorEl.style.display = "block";
+        return;
+    }
+
+    if (!hoursInput) {
+        errorEl.textContent = "Please enter the number of hours.";
+        errorEl.style.display = "block";
+        return;
+    }
+
+    const hours = parseFloat(hoursInput);
+
+    if (isNaN(hours) || hours <= 0) {
+        errorEl.textContent = "Hours must be a positive number.";
+        errorEl.style.display = "block";
+        return;
+    }
+
+    const decimalParts = hoursInput.split(".");
+    if (decimalParts.length === 2 && decimalParts[1].length > 2) {
+        errorEl.textContent = "Hours can have at most 2 decimal places (e.g. 0.25).";
+        errorEl.style.display = "block";
+        return;
+    }
+
+    const caloriesBurned = Math.round(selectedExercise.calories_per_hour * hours);
+
+    try {
+        const response = await fetch("/exercise-logs", {
+            method: "POST",
+            headers: getAuthHeaders(),
+            body: JSON.stringify({
+                exercise_name: selectedExercise.name,
+                calories_burned: caloriesBurned
+            })
+        });
+
+        if (response.status === 401) {
+            logoutUser();
+            return;
+        }
+
+        if (response.ok) {
+            closeAddExerciseModal();
+            loadExerciseLogs();
+        } else {
+            const data = await response.json();
+            errorEl.textContent = data.detail || "Failed to log exercise.";
+            errorEl.style.display = "block";
+        }
+    } catch (error) {
+        console.error("Error logging exercise:", error);
+        errorEl.textContent = "Something went wrong.";
+        errorEl.style.display = "block";
+    }
+}
+
+// ---------- Admin page ----------
+async function fetchCurrentUserFromToken() {
+    const token = getToken();
+    if (!token) return null;
+
+    try {
+        const response = await fetch("/me", {
+            headers: getAuthHeaders(false)
+        });
+
+        if (!response.ok) return null;
+
+        const user = await response.json();
+        localStorage.setItem("nutriUser", JSON.stringify(user));
+        return user;
+    } catch (error) {
+        console.error("Error fetching current user:", error);
+        return null;
+    }
+}
+
+async function setupAdminPage() {
+    const adminUserList = document.getElementById("admin-user-list");
+    const emptyLabel = document.getElementById("admin-empty");
+
+    if (!adminUserList || !emptyLabel) return;
+
+    const token = getToken();
+    if (!token) {
+        window.location.href = "/login";
+        return;
+    }
+
+    const currentUser = await fetchCurrentUserFromToken();
+
+    if (!currentUser) {
+        logoutUser();
+        return;
+    }
+
+    if (currentUser.role !== "admin") {
+        window.location.href = "/tracker";
+        return;
+    }
+
+    renderUserHeader(currentUser);
+    loadAdminUsers();
+}
+
+function renderAdminUsers(users) {
+    const listElement = document.getElementById("admin-user-list");
+    const emptyLabel = document.getElementById("admin-empty");
+    const currentUser = getCurrentUser();
+
+    if (!listElement || !emptyLabel) return;
+
+    listElement.innerHTML = "";
+
+    if (users.length === 0) {
+        emptyLabel.style.display = "block";
+        return;
+    }
+
+    emptyLabel.style.display = "none";
+
+    users.forEach(user => {
+        const li = document.createElement("li");
+        li.className = "item";
+
+        const isCurrentUser = currentUser && currentUser.id === user.id;
 
         li.innerHTML = `
             <div class="item-info">
-                <strong>${safeName}</strong> - ${item.calories} kcal
+                <strong>${escapeHtml(user.username)}</strong> - ${escapeHtml(user.email)} (${escapeHtml(user.role)})
             </div>
             <div class="actions">
-                <button class="edit-btn" onclick="openEditModal('${item.id}', ${JSON.stringify(item.food_name)}, ${item.calories})">Edit</button>
-                <button class="delete-btn" onclick="openDeleteModal('${item.id}')">Delete</button>
+                <select onchange="changeUserRole('${user.id}', this.value)" ${isCurrentUser ? "disabled" : ""}>
+                    <option value="user" ${user.role === "user" ? "selected" : ""}>User</option>
+                    <option value="admin" ${user.role === "admin" ? "selected" : ""}>Admin</option>
+                </select>
+                <button class="delete-btn" onclick="deleteAdminUser('${user.id}')" ${isCurrentUser ? "disabled" : ""}>Delete</button>
             </div>
         `;
 
         listElement.appendChild(li);
     });
+}
 
-    totalDisplay.innerText = total;
+async function loadAdminUsers() {
+    const listElement = document.getElementById("admin-user-list");
+    const emptyLabel = document.getElementById("admin-empty");
+
+    if (!listElement || !emptyLabel) return;
+
+    try {
+        const response = await fetch("/admin/users", {
+            headers: getAuthHeaders(false)
+        });
+
+        if (response.status === 401) {
+            logoutUser();
+            return;
+        }
+
+        if (response.status === 403) {
+            window.location.href = "/tracker";
+            return;
+        }
+
+        adminUsers = await response.json();
+        renderAdminUsers(adminUsers);
+    } catch (error) {
+        console.error("Error loading admin users:", error);
+    }
+}
+
+function filterAdminUsers() {
+    const searchInput = document.getElementById("admin-user-search");
+    if (!searchInput) return;
+
+    const query = searchInput.value.trim().toLowerCase();
+
+    const filteredUsers = adminUsers.filter(user =>
+        user.username.toLowerCase().includes(query) ||
+        user.email.toLowerCase().includes(query)
+    );
+
+    renderAdminUsers(filteredUsers);
+}
+
+async function deleteAdminUser(userId) {
+    const confirmed = confirm("Are you sure you want to delete this user?");
+    if (!confirmed) return;
+
+    try {
+        const response = await fetch(`/admin/users/${userId}`, {
+            method: "DELETE",
+            headers: getAuthHeaders(false)
+        });
+
+        if (response.ok) {
+            loadAdminUsers();
+        } else {
+            const data = await response.json();
+            alert(data.detail || "Failed to delete user.");
+        }
+    } catch (error) {
+        console.error("Error deleting user:", error);
+        alert("Something went wrong.");
+    }
+}
+
+async function changeUserRole(userId, newRole) {
+    try {
+        const response = await fetch(`/admin/users/${userId}/role`, {
+            method: "PUT",
+            headers: getAuthHeaders(),
+            body: JSON.stringify({ role: newRole })
+        });
+
+        if (response.status === 401) {
+            logoutUser();
+            return;
+        }
+
+        if (response.status === 403) {
+            window.location.href = "/tracker";
+            return;
+        }
+
+        if (response.ok) {
+            loadAdminUsers();
+        } else {
+            const data = await response.json();
+            alert(data.detail || "Failed to update role.");
+            loadAdminUsers();
+        }
+    } catch (error) {
+        console.error("Error updating role:", error);
+        alert("Something went wrong.");
+        loadAdminUsers();
+    }
 }
 
 // ---------- Small helper ----------

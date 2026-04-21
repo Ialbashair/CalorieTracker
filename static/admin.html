@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nutri - Admin</title>
+    <link rel="icon" type="image/x-icon" href="/static/favicon.ico">
+    <link rel="stylesheet" href="/static/style.css">
+    <script src="/static/script.js" defer></script>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Admin Dashboard</h1>
+            <p>Manage Nutri user accounts</p>
+        </header>
+        <div class="section">
+            <input
+                type="text"
+                id="admin-user-search"
+                placeholder="Search by username or email"
+                oninput="filterAdminUsers()"
+            >
+        </div>
+
+        <section class="section">
+            <div class="section-header">
+                <h2>All Users</h2>
+            </div>
+            <p id="admin-empty" class="empty-label">No users found.</p>
+            <ul id="admin-user-list"></ul>
+        </section>
+    </div>
+</body>
+</html>

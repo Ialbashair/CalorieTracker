@@ -1,5 +1,5 @@
 :root {
-    --primary: #4f46e5;
+    --primary: #06c206;
     --secondary: #10b981;
     --danger: #ef4444;
     --warning: #fbbf24;
@@ -22,7 +22,7 @@ body {
 }
 
 .container {
-    width: 600px; 
+    width: 600px;
     background: var(--card);
     padding: 40px;
     border-radius: 12px;
@@ -41,11 +41,6 @@ header h1 {
     letter-spacing: -1px;
 }
 
-header p {
-    color: #6b7280;
-    margin-top: 5px;
-}
-
 .summary-card {
     background: var(--primary);
     color: white;
@@ -60,13 +55,41 @@ header p {
     font-weight: 500;
 }
 
-.form-section form {
-    display: grid;
-    grid-template-columns: 1fr 120px 120px;
-    gap: 15px;
-    margin-bottom: 30px;
+/* Sections */
+.section {
+    margin-bottom: 25px;
 }
 
+.section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 15px;
+}
+
+.section-header h2 {
+    margin: 0;
+    font-size: 1.3rem;
+    color: var(--text);
+}
+
+.add-section-btn {
+    background-color: var(--primary);
+    color: white;
+    padding: 8px 16px;
+}
+
+.empty-label {
+    text-align: center;
+    color: #9ca3af;
+    font-size: 0.95rem;
+    padding: 25px 0;
+    margin: 0;
+    border: 2px dashed var(--border);
+    border-radius: 8px;
+}
+
+/* Inputs & Buttons */
 input {
     padding: 12px 15px;
     border: 2px solid var(--border);
@@ -93,12 +116,14 @@ button:active {
     transform: scale(0.98);
 }
 
-#add-btn {
-    background-color: var(--secondary);
-    color: white;
+/* List Items */
+#calorie-list,
+#exercise-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
 }
 
-/* List Styling */
 .item {
     display: flex;
     justify-content: space-between;
@@ -106,6 +131,7 @@ button:active {
     padding: 15px;
     background: #f9fafb;
     border: 1px solid var(--border);
+    border-left: 4px solid var(--primary);
     border-radius: 8px;
     margin-bottom: 10px;
 }
@@ -135,20 +161,18 @@ button:active {
     padding: 8px 15px;
 }
 
-
-/* Modal Background */
+/* Modal */
 .modal {
-    display: none; /* Hidden by default */
+    display: none;
     position: fixed;
     z-index: 100;
     left: 0;
     top: 0;
     width: 100%;
     height: 100%;
-    background-color: rgba(0,0,0,0.5); /* Black w/ opacity */
+    background-color: rgba(0, 0, 0, 0.5);
 }
 
-/* Modal Box */
 .modal-content {
     background-color: white;
     margin: 15% auto;
@@ -160,53 +184,84 @@ button:active {
     gap: 15px;
 }
 
+.modal-content form {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+
 .modal-actions {
     display: flex;
     gap: 10px;
     justify-content: flex-end;
 }
 
-.save-btn { background-color: var(--secondary); color: white; }
-.cancel-btn { background-color: var(--danger); color: white; }
+.save-btn {
+    background-color: var(--secondary);
+    color: white;
+    padding: 10px 20px;
+}
 
+.cancel-btn {
+    background-color: var(--danger);
+    color: white;
+    padding: 10px 20px;
+}
 
+.delete-confirm-btn {
+    background-color: var(--danger);
+    color: white;
+    padding: 10px 20px;
+}
 
 .delete-confirm-btn:hover {
     background-color: #dc2626;
 }
 
-.auth-container {
-    max-width: 500px;
+/* Search dropdown */
+.search-wrapper {
+    position: relative;
 }
 
-.auth-container .form-section form {
-    display: flex;
-    flex-direction: column;
-    gap: 15px;
+.search-dropdown {
+    display: none;
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background: white;
+    border: 2px solid var(--border);
+    border-top: none;
+    border-radius: 0 0 8px 8px;
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    max-height: 200px;
+    overflow-y: auto;
+    z-index: 110;
 }
 
-.auth-container button {
-    padding: 12px;
+.search-dropdown li {
+    padding: 10px 15px;
+    cursor: pointer;
+    font-size: 0.95rem;
 }
 
-.auth-message {
-    text-align: center;
-    margin-top: 15px;
-    font-weight: 600;
-    min-height: 24px;
-}
-
-.auth-links {
-    margin-top: 20px;
-    text-align: center;
-}
-
-.auth-links a {
+.search-dropdown li:hover {
+    background-color: var(--bg);
     color: var(--primary);
-    text-decoration: none;
-    font-weight: 600;
 }
 
-.auth-links a:hover {
-    text-decoration: underline;
+#admin-user-search {
+    width: 100%;
+    box-sizing: border-box;
+    margin-bottom: 15px;
+}
+
+.actions select {
+    padding: 8px 12px;
+    border: 2px solid var(--border);
+    border-radius: 8px;
+    font-size: 0.9rem;
+    background: white;
 }
