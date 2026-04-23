@@ -2,6 +2,8 @@ console.log("SCRIPT.JS LOADED");
 
 const REGISTER_URL = "/register";
 const LOGIN_URL = "/login";
+
+// ---------- Feed state ----------
 let feedOffset = 0;
 let feedLimit = 10;
 let isLoadingFeed = false;
@@ -9,13 +11,17 @@ let hasMoreFeedPosts = true;
 
 // ---------- Page setup ----------
 window.onload = async () => {
+    applySavedTheme();
+
     setupRegisterForm();
     setupLoginForm();
+
     await setupCaloriePage();
     await setupAdminPage();
     await setupCreatePostPage();
     await setupFeedPage();
     await setupProfilePage();
+    await setupSettingsPage();
 };
 
 // ---------- Auth helpers ----------
@@ -67,6 +73,23 @@ async function fetchCurrentUserFromToken() {
         console.error("Error fetching current user:", error);
         return null;
     }
+}
+
+// ---------- Theme helpers ----------
+function applySavedTheme() {
+    const savedTheme = localStorage.getItem("nutriTheme") || "light";
+    document.body.classList.toggle("dark-mode", savedTheme === "dark");
+
+    const themeSelect = document.getElementById("theme-select");
+    if (themeSelect) {
+        themeSelect.value = savedTheme;
+    }
+}
+
+function setTheme(theme) {
+    const finalTheme = theme === "dark" ? "dark" : "light";
+    localStorage.setItem("nutriTheme", finalTheme);
+    document.body.classList.toggle("dark-mode", finalTheme === "dark");
 }
 
 // ---------- Register ----------
@@ -181,6 +204,7 @@ function renderUserHeader(user) {
         </div>
         <div class="user-bar-right">
             <span class="user-role-pill">${escapeHtml(user.role)}</span>
+            <a href="/settings" class="settings-gear" title="Settings">⚙️</a>
             <button onclick="logoutUser()">Logout</button>
         </div>
     `;
@@ -211,6 +235,9 @@ async function setupCaloriePage() {
 }
 
 // ---------- Food section ----------
+let foodList = [];
+let selectedFood = null;
+
 async function loadFoodLogs() {
     try {
         const response = await fetch("/food-logs", {
@@ -266,11 +293,11 @@ function renderFoodList(logs) {
     totalDisplay.innerText = total;
 }
 
-let foodList = [];
-let selectedFood = null;
-
 async function openAddFoodModal() {
-    document.getElementById("add-food-modal").style.display = "block";
+    const modal = document.getElementById("add-food-modal");
+    if (modal) {
+        modal.style.display = "block";
+    }
 
     try {
         const response = await fetch("/foods", {
@@ -290,12 +317,16 @@ async function openAddFoodModal() {
     }
 
     const searchInput = document.getElementById("food-search");
-    searchInput.focus();
-    searchInput.oninput = () => filterFoodSearch(searchInput.value);
+    if (searchInput) {
+        searchInput.focus();
+        searchInput.oninput = () => filterFoodSearch(searchInput.value);
+    }
 }
 
 function filterFoodSearch(query) {
     const resultsEl = document.getElementById("food-results");
+    if (!resultsEl) return;
+
     resultsEl.innerHTML = "";
     selectedFood = null;
 
@@ -316,7 +347,10 @@ function filterFoodSearch(query) {
         const li = document.createElement("li");
         li.textContent = f.name;
         li.onclick = () => {
-            document.getElementById("food-search").value = f.name;
+            const foodSearch = document.getElementById("food-search");
+            if (foodSearch) {
+                foodSearch.value = f.name;
+            }
             selectedFood = f;
             resultsEl.innerHTML = "";
             resultsEl.style.display = "none";
@@ -328,20 +362,33 @@ function filterFoodSearch(query) {
 }
 
 function closeAddFoodModal() {
-    document.getElementById("add-food-modal").style.display = "none";
-    document.getElementById("food-search").value = "";
-    document.getElementById("food-grams").value = "";
-    document.getElementById("food-error").style.display = "none";
-    document.getElementById("food-results").innerHTML = "";
-    document.getElementById("food-results").style.display = "none";
+    const modal = document.getElementById("add-food-modal");
+    if (modal) {
+        modal.style.display = "none";
+    }
+
+    const foodSearch = document.getElementById("food-search");
+    const foodGrams = document.getElementById("food-grams");
+    const foodError = document.getElementById("food-error");
+    const foodResults = document.getElementById("food-results");
+
+    if (foodSearch) foodSearch.value = "";
+    if (foodGrams) foodGrams.value = "";
+    if (foodError) foodError.style.display = "none";
+    if (foodResults) {
+        foodResults.innerHTML = "";
+        foodResults.style.display = "none";
+    }
+
     foodList = [];
     selectedFood = null;
 }
 
 async function addFoodEntry() {
-    const gramsInput = document.getElementById("food-grams").value.trim();
+    const gramsInput = document.getElementById("food-grams")?.value.trim() || "";
     const errorEl = document.getElementById("food-error");
 
+    if (!errorEl) return;
     errorEl.style.display = "none";
 
     if (!selectedFood) {
@@ -391,12 +438,8 @@ async function addFoodEntry() {
         if (response.ok) {
             closeAddFoodModal();
             loadFoodLogs();
-            closeAddFoodModal();
-            loadFoodLogs();
         } else {
             const data = await response.json();
-            errorEl.textContent = data.detail || "Failed to log food.";
-            errorEl.style.display = "block";
             errorEl.textContent = data.detail || "Failed to log food.";
             errorEl.style.display = "block";
         }
@@ -404,13 +447,13 @@ async function addFoodEntry() {
         console.error("Error logging food:", error);
         errorEl.textContent = "Something went wrong.";
         errorEl.style.display = "block";
-        console.error("Error logging food:", error);
-        errorEl.textContent = "Something went wrong.";
-        errorEl.style.display = "block";
     }
 }
 
 // ---------- Exercise section ----------
+let exerciseList = [];
+let selectedExercise = null;
+
 async function loadExerciseLogs() {
     try {
         const response = await fetch("/exercise-logs", {
@@ -470,11 +513,11 @@ function limitDecimals(input, maxPlaces) {
     }
 }
 
-let exerciseList = [];
-let selectedExercise = null;
-
 async function openAddExerciseModal() {
-    document.getElementById("add-exercise-modal").style.display = "block";
+    const modal = document.getElementById("add-exercise-modal");
+    if (modal) {
+        modal.style.display = "block";
+    }
 
     try {
         const response = await fetch("/exercises", {
@@ -491,16 +534,19 @@ async function openAddExerciseModal() {
         }
     } catch (error) {
         console.error("Error fetching exercises:", error);
-        console.error("Error fetching exercises:", error);
     }
 
     const searchInput = document.getElementById("exercise-search");
-    searchInput.focus();
-    searchInput.oninput = () => filterExerciseSearch(searchInput.value);
+    if (searchInput) {
+        searchInput.focus();
+        searchInput.oninput = () => filterExerciseSearch(searchInput.value);
+    }
 }
 
 function filterExerciseSearch(query) {
     const resultsEl = document.getElementById("exercise-results");
+    if (!resultsEl) return;
+
     resultsEl.innerHTML = "";
     selectedExercise = null;
 
@@ -521,7 +567,10 @@ function filterExerciseSearch(query) {
         const li = document.createElement("li");
         li.textContent = ex.name;
         li.onclick = () => {
-            document.getElementById("exercise-search").value = ex.name;
+            const exerciseSearch = document.getElementById("exercise-search");
+            if (exerciseSearch) {
+                exerciseSearch.value = ex.name;
+            }
             selectedExercise = ex;
             resultsEl.innerHTML = "";
             resultsEl.style.display = "none";
@@ -533,20 +582,33 @@ function filterExerciseSearch(query) {
 }
 
 function closeAddExerciseModal() {
-    document.getElementById("add-exercise-modal").style.display = "none";
-    document.getElementById("exercise-search").value = "";
-    document.getElementById("exercise-hours").value = "";
-    document.getElementById("exercise-error").style.display = "none";
-    document.getElementById("exercise-results").innerHTML = "";
-    document.getElementById("exercise-results").style.display = "none";
+    const modal = document.getElementById("add-exercise-modal");
+    if (modal) {
+        modal.style.display = "none";
+    }
+
+    const exerciseSearch = document.getElementById("exercise-search");
+    const exerciseHours = document.getElementById("exercise-hours");
+    const exerciseError = document.getElementById("exercise-error");
+    const exerciseResults = document.getElementById("exercise-results");
+
+    if (exerciseSearch) exerciseSearch.value = "";
+    if (exerciseHours) exerciseHours.value = "";
+    if (exerciseError) exerciseError.style.display = "none";
+    if (exerciseResults) {
+        exerciseResults.innerHTML = "";
+        exerciseResults.style.display = "none";
+    }
+
     exerciseList = [];
     selectedExercise = null;
 }
 
 async function addExerciseEntry() {
-    const hoursInput = document.getElementById("exercise-hours").value.trim();
+    const hoursInput = document.getElementById("exercise-hours")?.value.trim() || "";
     const errorEl = document.getElementById("exercise-error");
 
+    if (!errorEl) return;
     errorEl.style.display = "none";
 
     if (!selectedExercise) {
@@ -596,12 +658,8 @@ async function addExerciseEntry() {
         if (response.ok) {
             closeAddExerciseModal();
             loadExerciseLogs();
-            closeAddExerciseModal();
-            loadExerciseLogs();
         } else {
             const data = await response.json();
-            errorEl.textContent = data.detail || "Failed to log exercise.";
-            errorEl.style.display = "block";
             errorEl.textContent = data.detail || "Failed to log exercise.";
             errorEl.style.display = "block";
         }
@@ -777,6 +835,7 @@ async function deleteAdminUser(userId) {
         alert("Something went wrong.");
     }
 }
+
 // ---------- Social Feed ----------
 async function setupFeedPage() {
     const feedContainer = document.getElementById("feed-posts");
@@ -797,12 +856,16 @@ async function setupFeedPage() {
 
     renderUserHeader(currentUser);
 
-    // Reset feed state whenever page loads
     feedOffset = 0;
     feedLimit = 10;
     isLoadingFeed = false;
     hasMoreFeedPosts = true;
     feedContainer.innerHTML = "";
+
+    const endEl = document.getElementById("feed-end");
+    if (endEl) {
+        endEl.style.display = "none";
+    }
 
     await loadFeedPosts();
 
@@ -840,9 +903,6 @@ async function loadFeedPosts() {
                 endEl.style.display = "block";
             }
         }
-        if (!hasMoreFeedPosts && loadingEl) {
-            loadingEl.style.display = "none";
-        }
 
         appendFeedPosts(posts);
         feedOffset += posts.length;
@@ -864,7 +924,6 @@ function handleFeedScroll() {
     const windowHeight = window.innerHeight;
     const documentHeight = document.documentElement.scrollHeight;
 
-    // Trigger when user gets near the bottom
     if (scrollTop + windowHeight >= documentHeight - 250) {
         loadFeedPosts();
     }
@@ -1004,6 +1063,24 @@ function updateCarousel(postIndex, currentIndex) {
     });
 }
 
+function formatPostDate(dateString) {
+    if (!dateString) return "";
+
+    const date = new Date(dateString);
+    const now = new Date();
+
+    const diffMs = now - date;
+    const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+
+    if (diffHours < 1) return "Just now";
+    if (diffHours < 24) return `${diffHours}h ago`;
+
+    const diffDays = Math.floor(diffHours / 24);
+    if (diffDays === 1) return "Yesterday";
+
+    return date.toLocaleDateString();
+}
+
 async function toggleLike(postId, button) {
     try {
         const response = await fetch(`/posts/${postId}/like`, {
@@ -1022,22 +1099,22 @@ async function toggleLike(postId, button) {
             const liked = data.liked;
             const likes = data.likes;
 
-            // Update button UI
             button.textContent = liked ? "❤️" : "🤍";
             button.classList.toggle("liked", liked);
 
-            // Update count
             const countEl = button.nextElementSibling;
             if (countEl) {
                 countEl.textContent = likes;
             }
+
+            loadProfileStats();
         }
     } catch (error) {
         console.error("Error liking post:", error);
     }
 }
 
-// ---------- Social Feed/Create new Post page ----------
+// ---------- Create post page ----------
 async function setupCreatePostPage() {
     const usernameEl = document.getElementById("create-post-username");
     const imageInput = document.getElementById("post-images");
@@ -1146,74 +1223,7 @@ async function submitPost() {
     }
 }
 
-async function editPost(postId) {
-    const captionEl = document.getElementById(`caption-${postId}`);
-    if (!captionEl) return;
-
-    const currentCaption = captionEl.textContent;
-    const newCaption = prompt("Edit your caption:", currentCaption);
-
-    if (newCaption === null) return;
-
-    const trimmedCaption = newCaption.trim();
-    if (!trimmedCaption) {
-        alert("Caption cannot be empty.");
-        return;
-    }
-
-    try {
-        const response = await fetch(`/posts/${postId}`, {
-            method: "PUT",
-            headers: getAuthHeaders(),
-            body: JSON.stringify({ caption: trimmedCaption })
-        });
-
-        if (response.status === 401) {
-            logoutUser();
-            return;
-        }
-
-        const data = await response.json();
-
-        if (response.ok) {
-            captionEl.textContent = data.caption;
-        } else {
-            alert(data.detail || "Failed to update post.");
-        }
-    } catch (error) {
-        console.error("Error editing post:", error);
-        alert("Something went wrong.");
-    }
-}
-
-async function deletePost(postId) {
-    const confirmed = confirm("Are you sure you want to delete this post?");
-    if (!confirmed) return;
-
-    try {
-        const response = await fetch(`/posts/${postId}`, {
-            method: "DELETE",
-            headers: getAuthHeaders(false)
-        });
-
-        if (response.status === 401) {
-            logoutUser();
-            return;
-        }
-
-        if (response.ok) {
-            loadFeedPosts();
-        } else {
-            const data = await response.json();
-            alert(data.detail || "Failed to delete post.");
-        }
-    } catch (error) {
-        console.error("Error deleting post:", error);
-        alert("Something went wrong.");
-    }
-}
-
-//-------Social Feed/Profile Page-----
+// ---------- Profile page ----------
 async function setupProfilePage() {
     const profilePosts = document.getElementById("profile-posts");
     const profileUsername = document.getElementById("profile-username");
@@ -1242,6 +1252,10 @@ async function setupProfilePage() {
 }
 
 async function loadProfileStats() {
+    const postCountEl = document.getElementById("profile-post-count");
+    const totalLikesEl = document.getElementById("profile-total-likes");
+    if (!postCountEl || !totalLikesEl) return;
+
     try {
         const response = await fetch("/my-profile-stats", {
             headers: getAuthHeaders(false)
@@ -1253,9 +1267,8 @@ async function loadProfileStats() {
         }
 
         const stats = await response.json();
-
-        document.getElementById("profile-post-count").textContent = stats.post_count ?? 0;
-        document.getElementById("profile-total-likes").textContent = stats.total_likes ?? 0;
+        postCountEl.textContent = stats.post_count ?? 0;
+        totalLikesEl.textContent = stats.total_likes ?? 0;
     } catch (error) {
         console.error("Error loading profile stats:", error);
     }
@@ -1419,6 +1432,199 @@ function updateProfileCarousel(postIndex, currentIndex) {
     });
 }
 
+async function editPost(postId) {
+    const captionEl = document.getElementById(`caption-${postId}`);
+    if (!captionEl) return;
+
+    const currentCaption = captionEl.textContent;
+    const newCaption = prompt("Edit your caption:", currentCaption);
+
+    if (newCaption === null) return;
+
+    const trimmedCaption = newCaption.trim();
+    if (!trimmedCaption) {
+        alert("Caption cannot be empty.");
+        return;
+    }
+
+    try {
+        const response = await fetch(`/posts/${postId}`, {
+            method: "PUT",
+            headers: getAuthHeaders(),
+            body: JSON.stringify({ caption: trimmedCaption })
+        });
+
+        if (response.status === 401) {
+            logoutUser();
+            return;
+        }
+
+        const data = await response.json();
+
+        if (response.ok) {
+            captionEl.textContent = data.caption;
+            loadProfilePosts();
+        } else {
+            alert(data.detail || "Failed to update post.");
+        }
+    } catch (error) {
+        console.error("Error editing post:", error);
+        alert("Something went wrong.");
+    }
+}
+
+async function deletePost(postId) {
+    const confirmed = confirm("Are you sure you want to delete this post?");
+    if (!confirmed) return;
+
+    try {
+        const response = await fetch(`/posts/${postId}`, {
+            method: "DELETE",
+            headers: getAuthHeaders(false)
+        });
+
+        if (response.status === 401) {
+            logoutUser();
+            return;
+        }
+
+        if (response.ok) {
+            loadProfilePosts();
+            loadProfileStats();
+        } else {
+            const data = await response.json();
+            alert(data.detail || "Failed to delete post.");
+        }
+    } catch (error) {
+        console.error("Error deleting post:", error);
+        alert("Something went wrong.");
+    }
+}
+
+// ---------- Settings page ----------
+async function setupSettingsPage() {
+    const currentUsernameEl = document.getElementById("settings-current-username");
+    const currentEmailEl = document.getElementById("settings-current-email");
+    const themeSelect = document.getElementById("theme-select");
+
+    if (!currentUsernameEl || !currentEmailEl) return;
+
+    const token = getToken();
+    if (!token) {
+        window.location.href = "/login";
+        return;
+    }
+
+    const currentUser = await fetchCurrentUserFromToken();
+    if (!currentUser) {
+        logoutUser();
+        return;
+    }
+
+    renderUserHeader(currentUser);
+
+    currentUsernameEl.textContent = currentUser.username;
+    currentEmailEl.textContent = currentUser.email;
+
+    if (themeSelect) {
+        themeSelect.value = localStorage.getItem("nutriTheme") || "light";
+    }
+}
+
+async function submitUsernameChange() {
+    const newUsernameInput = document.getElementById("settings-new-username");
+    const messageEl = document.getElementById("settings-username-message");
+    const currentUsernameEl = document.getElementById("settings-current-username");
+
+    if (!newUsernameInput || !messageEl || !currentUsernameEl) return;
+
+    const newUsername = newUsernameInput.value.trim();
+
+    if (!newUsername) {
+        messageEl.textContent = "Please enter a new username.";
+        messageEl.style.color = "red";
+        return;
+    }
+
+    try {
+        const response = await fetch("/settings/username", {
+            method: "PUT",
+            headers: getAuthHeaders(),
+            body: JSON.stringify({ new_username: newUsername })
+        });
+
+        if (response.status === 401) {
+            logoutUser();
+            return;
+        }
+
+        const data = await response.json();
+
+        if (response.ok) {
+            localStorage.setItem("nutriUser", JSON.stringify(data));
+            currentUsernameEl.textContent = data.username;
+            newUsernameInput.value = "";
+            messageEl.textContent = "Username updated successfully.";
+            messageEl.style.color = "green";
+
+            renderUserHeader(data);
+        } else {
+            messageEl.textContent = data.detail || "Failed to update username.";
+            messageEl.style.color = "red";
+        }
+    } catch (error) {
+        console.error("Error updating username:", error);
+        messageEl.textContent = "Something went wrong.";
+        messageEl.style.color = "red";
+    }
+}
+
+async function submitPasswordChange() {
+    const currentPasswordInput = document.getElementById("settings-current-password");
+    const newPasswordInput = document.getElementById("settings-new-password");
+    const messageEl = document.getElementById("settings-password-message");
+
+    if (!currentPasswordInput || !newPasswordInput || !messageEl) return;
+
+    const current_password = currentPasswordInput.value.trim();
+    const new_password = newPasswordInput.value.trim();
+
+    if (!current_password || !new_password) {
+        messageEl.textContent = "Please fill out both password fields.";
+        messageEl.style.color = "red";
+        return;
+    }
+
+    try {
+        const response = await fetch("/settings/password", {
+            method: "PUT",
+            headers: getAuthHeaders(),
+            body: JSON.stringify({ current_password, new_password })
+        });
+
+        if (response.status === 401) {
+            logoutUser();
+            return;
+        }
+
+        const data = await response.json();
+
+        if (response.ok) {
+            currentPasswordInput.value = "";
+            newPasswordInput.value = "";
+            messageEl.textContent = data.message || "Password updated successfully.";
+            messageEl.style.color = "green";
+        } else {
+            messageEl.textContent = data.detail || "Failed to update password.";
+            messageEl.style.color = "red";
+        }
+    } catch (error) {
+        console.error("Error updating password:", error);
+        messageEl.textContent = "Something went wrong.";
+        messageEl.style.color = "red";
+    }
+}
+
 // ---------- Small helper ----------
 function escapeHtml(value) {
     return String(value)
@@ -1427,21 +1633,4 @@ function escapeHtml(value) {
         .replaceAll(">", "&gt;")
         .replaceAll('"', "&quot;")
         .replaceAll("'", "&#39;");
-}
-function formatPostDate(dateString) {
-    if (!dateString) return "";
-
-    const date = new Date(dateString);
-    const now = new Date();
-
-    const diffMs = now - date;
-    const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
-
-    if (diffHours < 1) return "Just now";
-    if (diffHours < 24) return `${diffHours}h ago`;
-
-    const diffDays = Math.floor(diffHours / 24);
-    if (diffDays === 1) return "Yesterday";
-
-    return date.toLocaleDateString();
 }

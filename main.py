@@ -178,6 +178,13 @@ class ProfileStats(BaseModel):
     post_count: int
     total_likes: int
 
+class UsernameUpdate(BaseModel):
+    new_username: str
+
+class PasswordUpdate(BaseModel):
+    current_password: str
+    new_password: str
+
 # ---------- Helper functions ----------
 def serialize_user(user) -> dict:
     return {
@@ -525,6 +532,53 @@ def get_my_profile_stats(current_user=Depends(get_current_user)):
         "post_count": len(posts),
         "total_likes": total_likes
     }
+# ---------- Settings page routes ----------
+@app.put("/settings/username", response_model=UserOut)
+def update_username(
+    username_update: UsernameUpdate,
+    current_user=Depends(get_current_user)
+):
+    new_username = username_update.new_username.strip()
+
+    if not new_username:
+        raise HTTPException(status_code=400, detail="Username cannot be empty")
+
+    existing_user = users_collection.find_one({"username": new_username})
+    if existing_user and str(existing_user["_id"]) != str(current_user["_id"]):
+        raise HTTPException(status_code=400, detail="Username already taken")
+
+    users_collection.update_one(
+        {"_id": current_user["_id"]},
+        {"$set": {"username": new_username}}
+    )
+
+    posts_collection.update_many(
+        {"user_id": str(current_user["_id"])},
+        {"$set": {"username": new_username}}
+    )
+
+    updated_user = users_collection.find_one({"_id": current_user["_id"]})
+    return serialize_user(updated_user)
+
+@app.put("/settings/password")
+def update_password(
+    password_update: PasswordUpdate,
+    current_user=Depends(get_current_user)
+):
+    if not verify_password(password_update.current_password, current_user["password"]):
+        raise HTTPException(status_code=400, detail="Current password is incorrect")
+
+    if not password_update.new_password.strip():
+        raise HTTPException(status_code=400, detail="New password cannot be empty")
+
+    new_hashed_password = hash_password(password_update.new_password)
+
+    users_collection.update_one(
+        {"_id": current_user["_id"]},
+        {"$set": {"password": new_hashed_password}}
+    )
+
+    return {"message": "Password updated successfully"}
 
 # ---------- Admin routes ----------
 @app.get("/admin/users", response_model=List[UserSummary])
@@ -607,3 +661,7 @@ def admin_page():
 @app.get("/stats")
 def stats_page():
     return FileResponse("static/stats.html")
+
+@app.get("/settings")
+def settings_page():
+    return FileResponse("static/settings.html")
