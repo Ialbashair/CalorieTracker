@@ -256,7 +256,7 @@ function renderFoodList(logs) {
         total += log.calories;
 
         const li = document.createElement("li");
-        li.className = "item";
+        li.className = "item food-item";
 
         const itemInfo = document.createElement("div");
         itemInfo.className = "item-info";
@@ -267,6 +267,13 @@ function renderFoodList(logs) {
         itemInfo.append(` - ${log.calories} kcal`);
 
         li.appendChild(itemInfo);
+
+        const deleteBtn = document.createElement("button");
+        deleteBtn.className = "delete-btn food-delete-btn";
+        deleteBtn.textContent = "Delete";
+        deleteBtn.onclick = () => openDeleteFoodModal(log.id);
+        li.appendChild(deleteBtn);
+
         listElement.appendChild(li);
     });
 
@@ -417,6 +424,50 @@ async function addFoodEntry() {
     }
 }
 
+let foodLogToDelete = null;
+
+function openDeleteFoodModal(logId) {
+    foodLogToDelete = logId;
+    document.getElementById("delete-food-modal").style.display = "block";
+}
+
+function closeDeleteFoodModal() {
+    foodLogToDelete = null;
+    document.getElementById("delete-food-modal").style.display = "none";
+}
+
+async function confirmDeleteFood() {
+    if (!foodLogToDelete) {
+        closeDeleteFoodModal();
+        return;
+    }
+
+    try {
+        const response = await fetch(`/food-logs/${foodLogToDelete}`, {
+            method: "DELETE",
+            headers: getAuthHeaders(false)
+        });
+
+        if (response.status === 401) {
+            logoutUser();
+            return;
+        }
+
+        if (response.ok) {
+            closeDeleteFoodModal();
+            loadFoodLogs();
+        } else {
+            const data = await response.json().catch(() => ({}));
+            alert(data.detail || "Failed to delete food log.");
+            closeDeleteFoodModal();
+        }
+    } catch (error) {
+        console.error("Error deleting food log:", error);
+        alert("Something went wrong.");
+        closeDeleteFoodModal();
+    }
+}
+
 // ---------- Exercise section ----------
 async function loadExerciseLogs() {
     try {
@@ -451,7 +502,7 @@ function renderExerciseList(logs) {
 
     logs.forEach(log => {
         const li = document.createElement("li");
-        li.className = "item";
+        li.className = "item exercise-item";
 
         const itemInfo = document.createElement("div");
         itemInfo.className = "item-info";
@@ -461,8 +512,59 @@ function renderExerciseList(logs) {
         itemInfo.append(` - ${log.calories_burned} kcal burned`);
 
         li.appendChild(itemInfo);
+
+        const deleteBtn = document.createElement("button");
+        deleteBtn.className = "delete-btn exercise-delete-btn";
+        deleteBtn.textContent = "Delete";
+        deleteBtn.onclick = () => openDeleteExerciseModal(log.id);
+        li.appendChild(deleteBtn);
+
         listElement.appendChild(li);
     });
+}
+
+let exerciseLogToDelete = null;
+
+function openDeleteExerciseModal(logId) {
+    exerciseLogToDelete = logId;
+    document.getElementById("delete-exercise-modal").style.display = "block";
+}
+
+function closeDeleteExerciseModal() {
+    exerciseLogToDelete = null;
+    document.getElementById("delete-exercise-modal").style.display = "none";
+}
+
+async function confirmDeleteExercise() {
+    if (!exerciseLogToDelete) {
+        closeDeleteExerciseModal();
+        return;
+    }
+
+    try {
+        const response = await fetch(`/exercise-logs/${exerciseLogToDelete}`, {
+            method: "DELETE",
+            headers: getAuthHeaders(false)
+        });
+
+        if (response.status === 401) {
+            logoutUser();
+            return;
+        }
+
+        if (response.ok) {
+            closeDeleteExerciseModal();
+            loadExerciseLogs();
+        } else {
+            const data = await response.json().catch(() => ({}));
+            alert(data.detail || "Failed to delete exercise log.");
+            closeDeleteExerciseModal();
+        }
+    } catch (error) {
+        console.error("Error deleting exercise log:", error);
+        alert("Something went wrong.");
+        closeDeleteExerciseModal();
+    }
 }
 
 function limitDecimals(input, maxPlaces) {

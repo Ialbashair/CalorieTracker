@@ -204,6 +204,16 @@ button:active {
     padding: 8px 15px;
 }
 
+.food-item .food-delete-btn,
+.exercise-item .exercise-delete-btn {
+    visibility: hidden;
+}
+
+.food-item:hover .food-delete-btn,
+.exercise-item:hover .exercise-delete-btn {
+    visibility: visible;
+}
+
 /* Modal */
 .modal {
     display: none;

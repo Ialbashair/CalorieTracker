@@ -33,8 +33,10 @@ database = client["Nutri"]
 users_collection = database["User_Info"]
 foods_collection = database["Foods"]
 food_logs_collection = database["Food_logs"]
+food_logs_archive_collection = database["Food_logs_archive"]
 exercises_collection = database["Exercises"]
 exercise_logs_collection = database["Exercise_logs"]
+exercise_logs_archive_collection = database["Exercise_logs_archive"]
 
 # ---------- Security ----------
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -275,6 +277,23 @@ def add_food_log(log: FoodLogCreate, current_user=Depends(get_current_user)):
     return serialize_food_log(new_log)
 
 
+@app.delete("/food-logs/{log_id}", status_code=status.HTTP_204_NO_CONTENT)
+def archive_food_log(log_id: str, current_user=Depends(get_current_user)):
+    if not ObjectId.is_valid(log_id):
+        raise HTTPException(status_code=400, detail="Invalid food log ID")
+
+    user_id = str(current_user["_id"])
+    log = food_logs_collection.find_one({"_id": ObjectId(log_id), "user_id": user_id})
+
+    if not log:
+        raise HTTPException(status_code=404, detail="Food log not found")
+
+    food_logs_archive_collection.insert_one(log)
+    food_logs_collection.delete_one({"_id": ObjectId(log_id)})
+
+    return
+
+
 # ---------- Exercise routes ----------
 @app.get("/exercises")
 def get_exercises(current_user=Depends(get_current_user)):
@@ -307,6 +326,23 @@ def add_exercise_log(log: ExerciseLogCreate, current_user=Depends(get_current_us
         raise HTTPException(status_code=500, detail="Exercise log creation failed")
 
     return serialize_exercise_log(new_log)
+
+
+@app.delete("/exercise-logs/{log_id}", status_code=status.HTTP_204_NO_CONTENT)
+def archive_exercise_log(log_id: str, current_user=Depends(get_current_user)):
+    if not ObjectId.is_valid(log_id):
+        raise HTTPException(status_code=400, detail="Invalid exercise log ID")
+
+    user_id = str(current_user["_id"])
+    log = exercise_logs_collection.find_one({"_id": ObjectId(log_id), "user_id": user_id})
+
+    if not log:
+        raise HTTPException(status_code=404, detail="Exercise log not found")
+
+    exercise_logs_archive_collection.insert_one(log)
+    exercise_logs_collection.delete_one({"_id": ObjectId(log_id)})
+
+    return
 
 
 # ---------- Admin routes ----------
