@@ -117,6 +117,7 @@ class UserOut(BaseModel):
     username: str
     email: str
     role: str
+    created_at: Optional[str] = None
 
 
 class UserRoleUpdate(BaseModel):
@@ -185,13 +186,19 @@ class PasswordUpdate(BaseModel):
     current_password: str
     new_password: str
 
+class HomeTodayStats(BaseModel):
+    calories_consumed_today: int
+    calories_burned_today: int
+    net_calories_today: int
+
 # ---------- Helper functions ----------
 def serialize_user(user) -> dict:
     return {
         "id": str(user["_id"]),
         "username": user["username"],
         "email": user["email"],
-        "role": user["role"]
+        "role": user["role"],
+        "created_at": user["created_at"].isoformat() if "created_at" in user and user["created_at"] else None
     }
 
 
@@ -238,11 +245,12 @@ def register_user(user: UserCreate):
         raise HTTPException(status_code=400, detail="Username already taken")
 
     user_dict = {
-        "username": user.username,
-        "email": user.email,
-        "password": hash_password(user.password),
-        "role": "user"
-    }
+    "username": user.username,
+    "email": user.email,
+    "password": hash_password(user.password),
+    "role": "user",
+    "created_at": datetime.now(timezone.utc)
+}
 
     result = users_collection.insert_one(user_dict)
     new_user = users_collection.find_one({"_id": result.inserted_id})
@@ -628,6 +636,41 @@ def update_user_role(user_id: str, role_update: UserRoleUpdate, current_user=Dep
     updated_user = users_collection.find_one({"_id": ObjectId(user_id)})
     return serialize_user(updated_user)
 
+# ---------- Home routes ----------
+@app.get("/home/today-stats", response_model=HomeTodayStats)
+def get_home_today_stats(current_user=Depends(get_current_user)):
+    user_id = str(current_user["_id"])
+
+    now = datetime.now(timezone.utc)
+    start_of_day = datetime(now.year, now.month, now.day, tzinfo=timezone.utc)
+    end_of_day = start_of_day + timedelta(days=1)
+
+    food_logs = food_logs_collection.find({
+        "user_id": user_id,
+        "created_at": {
+            "$gte": start_of_day,
+            "$lt": end_of_day
+        }
+    })
+
+    exercise_logs = exercise_logs_collection.find({
+        "user_id": user_id,
+        "created_at": {
+            "$gte": start_of_day,
+            "$lt": end_of_day
+        }
+    })
+
+    calories_consumed_today = sum(log.get("calories", 0) for log in food_logs)
+    calories_burned_today = sum(log.get("calories_burned", 0) for log in exercise_logs)
+    net_calories_today = calories_consumed_today - calories_burned_today
+
+    return {
+        "calories_consumed_today": calories_consumed_today,
+        "calories_burned_today": calories_burned_today,
+        "net_calories_today": net_calories_today
+    }
+
 
 # ---------- Static assets ----------
 app.mount("/static", StaticFiles(directory="static"), name="static")
@@ -636,7 +679,7 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 # ---------- Page routes ----------
 @app.get("/")
 def root():
-    return RedirectResponse(url="/login")
+    return RedirectResponse(url="/home")
 
 
 @app.get("/register")
@@ -665,3 +708,7 @@ def stats_page():
 @app.get("/settings")
 def settings_page():
     return FileResponse("static/settings.html")
+
+@app.get("/home")
+def home_page():
+    return FileResponse("static/home.html")

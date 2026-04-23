@@ -688,6 +688,70 @@ button:active {
     margin-bottom: 15px;
 }
 
+/* ---------- Home Page ---------- */
+.home-profile-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    background: white;
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 24px;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.04);
+}
+
+.home-profile-picture {
+    width: 96px;
+    height: 96px;
+    border-radius: 999px;
+    background: #eef2ff;
+    color: var(--primary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 2rem;
+    font-weight: 700;
+    border: 2px solid var(--border);
+}
+
+.home-profile-link {
+    margin-top: 4px;
+}
+
+.home-stats-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 15px;
+}
+
+.home-stat-card {
+    background: white;
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 20px;
+    text-align: center;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.04);
+}
+
+.home-stat-label {
+    color: #6b7280;
+    font-weight: 600;
+    margin-bottom: 8px;
+}
+
+.home-stat-value {
+    font-size: 2rem;
+    font-weight: 800;
+    color: var(--primary);
+}
+
+.home-member-since {
+    text-align: center;
+    color: #6b7280;
+    font-size: 1rem;
+}
+
 /* ---------- Dark mode ---------- */
 body.dark-mode {
     --bg: #111827;
@@ -775,4 +839,67 @@ body.dark-mode .carousel-dot {
 
 body.dark-mode .active-dot {
     background: var(--primary);
+}
+
+.home-profile-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    background: white;
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 24px;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.04);
+}
+
+.home-profile-picture {
+    width: 96px;
+    height: 96px;
+    border-radius: 999px;
+    background: #eef2ff;
+    color: var(--primary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 2rem;
+    font-weight: 700;
+    border: 2px solid var(--border);
+}
+
+.home-profile-link {
+    margin-top: 4px;
+}
+
+.home-stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 15px;
+}
+
+.home-stat-card {
+    background: white;
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 20px;
+    text-align: center;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.04);
+}
+
+.home-stat-label {
+    color: #6b7280;
+    font-weight: 600;
+    margin-bottom: 8px;
+}
+
+.home-stat-value {
+    font-size: 2rem;
+    font-weight: 800;
+    color: var(--primary);
+}
+
+.home-member-since {
+    text-align: center;
+    color: #6b7280;
+    font-size: 1rem;
 }

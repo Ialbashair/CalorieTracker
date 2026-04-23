@@ -16,6 +16,7 @@ window.onload = async () => {
     setupRegisterForm();
     setupLoginForm();
 
+    await setupHomePage();
     await setupCaloriePage();
     await setupAdminPage();
     await setupCreatePostPage();
@@ -173,7 +174,7 @@ function setupLoginForm() {
                 message.style.color = "green";
 
                 setTimeout(() => {
-                    window.location.href = "/tracker";
+                    window.location.href = "/home";
                 }, 1000);
             } else {
                 message.textContent = data.detail || "Login failed.";
@@ -208,6 +209,71 @@ function renderUserHeader(user) {
             <button onclick="logoutUser()">Logout</button>
         </div>
     `;
+}
+
+// ---------- Home page ----------
+async function setupHomePage() {
+    const usernameEl = document.getElementById("home-username");
+    const consumedEl = document.getElementById("home-calories-consumed");
+    const burnedEl = document.getElementById("home-calories-burned");
+    const userSinceEl = document.getElementById("home-user-since");
+    const netEl = document.getElementById("home-net-calories");
+    
+    if (!usernameEl || !consumedEl || !burnedEl || !netEl || !userSinceEl) return;
+
+    const token = getToken();
+    if (!token) {
+        window.location.href = "/login";
+        return;
+    }
+
+    const currentUser = await fetchCurrentUserFromToken();
+    if (!currentUser) {
+        logoutUser();
+        return;
+    }
+
+    renderUserHeader(currentUser);
+    usernameEl.textContent = currentUser.username;
+
+    if (currentUser.created_at) {
+        const date = new Date(currentUser.created_at);
+        userSinceEl.textContent = `User Since ${date.toLocaleDateString()}`;
+    } else {
+        userSinceEl.textContent = "User Since --";
+    }
+
+    await loadHomeTodayStats();
+}
+
+async function loadHomeTodayStats() {
+    const consumedEl = document.getElementById("home-calories-consumed");
+    const burnedEl = document.getElementById("home-calories-burned");
+    const netEl = document.getElementById("home-net-calories");
+
+    if (!consumedEl || !burnedEl || !netEl) return;
+
+    try {
+        const response = await fetch("/home/today-stats", {
+            headers: getAuthHeaders(false)
+        });
+
+        if (response.status === 401) {
+            logoutUser();
+            return;
+        }
+
+        const data = await response.json();
+
+        consumedEl.textContent = data.calories_consumed_today ?? 0;
+        burnedEl.textContent = data.calories_burned_today ?? 0;
+        netEl.textContent = data.net_calories_today ?? 0;
+    } catch (error) {
+        console.error("Error loading home today stats:", error);
+        consumedEl.textContent = "0";
+        burnedEl.textContent = "0";
+        netEl.textContent = "0";
+    }
 }
 
 // ---------- Tracker page ----------
