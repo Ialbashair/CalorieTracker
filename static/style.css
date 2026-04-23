@@ -901,6 +901,7 @@ body.dark-mode .avatar-fallback {
     border-color: var(--border);
 }
 
+/* ---------- Home page ---------- */
 .home-profile-card {
     display: flex;
     flex-direction: column;
@@ -914,17 +915,9 @@ body.dark-mode .avatar-fallback {
 }
 
 .home-profile-picture {
-    width: 96px;
-    height: 96px;
-    border-radius: 999px;
-    background: #eef2ff;
-    color: var(--primary);
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 2rem;
-    font-weight: 700;
-    border: 2px solid var(--border);
 }
 
 .home-profile-link {
@@ -962,4 +955,64 @@ body.dark-mode .avatar-fallback {
     text-align: center;
     color: #6b7280;
     font-size: 1rem;
+}
+
+/* ---------- Shared avatar styles ---------- */
+.avatar-image,
+.avatar-fallback {
+    width: 42px;
+    height: 42px;
+    border-radius: 999px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    object-fit: cover;
+    border: 2px solid var(--border);
+    flex-shrink: 0;
+}
+
+.avatar-fallback {
+    background: #eef2ff;
+    color: var(--primary);
+    font-weight: 700;
+}
+
+.avatar-large {
+    width: 96px;
+    height: 96px;
+    font-size: 2rem;
+}
+
+/* ---------- Home dark mode fixes ---------- */
+body.dark-mode .home-profile-card,
+body.dark-mode .home-stat-card {
+    background: var(--card);
+    color: var(--text);
+    border-color: var(--border);
+}
+
+body.dark-mode #home-username {
+    color: var(--text);
+}
+
+body.dark-mode .home-stat-label,
+body.dark-mode .home-member-since {
+    color: #d1d5db;
+}
+
+body.dark-mode .avatar-fallback {
+    background: #111827;
+    color: var(--primary);
+    border-color: var(--border);
+}
+
+body.dark-mode .home-profile-link {
+    background: #111827;
+    color: var(--text);
+    border-color: var(--border);
+}
+
+body.dark-mode .home-profile-link:hover {
+    background: #1f2937;
+    color: var(--primary);
 }
