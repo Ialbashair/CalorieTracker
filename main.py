@@ -360,8 +360,12 @@ def profile_page():
     return FileResponse("static/profile.html")
 
 @app.get("/posts", response_model=List[PostOut])
-def get_recent_posts(current_user=Depends(get_current_user)):
-    posts = posts_collection.find().sort("created_at", -1).limit(10)
+def get_recent_posts(
+    skip: int = 0,
+    limit: int = 10,
+    current_user=Depends(get_current_user)
+):
+    posts = posts_collection.find().sort("created_at", -1).skip(skip).limit(limit)
     return [serialize_post(post) for post in posts]
 
 # ---------- Social Feed/Create Post routes ----------
@@ -603,8 +607,3 @@ def admin_page():
 @app.get("/stats")
 def stats_page():
     return FileResponse("static/stats.html")
-
-
-@app.get("/feed")
-def feed_page():
-    return FileResponse("static/feed.html")

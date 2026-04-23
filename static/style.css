@@ -673,3 +673,11 @@ button:active {
     color: #6b7280;
     font-size: 0.95rem;
 }
+
+.feed-loading {
+    text-align: center;
+    color: #6b7280;
+    font-size: 0.95rem;
+    font-weight: 600;
+    padding: 16px 0 8px;
+}

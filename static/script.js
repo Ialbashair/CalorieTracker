@@ -2,6 +2,10 @@ console.log("SCRIPT.JS LOADED");
 
 const REGISTER_URL = "/register";
 const LOGIN_URL = "/login";
+let feedOffset = 0;
+let feedLimit = 10;
+let isLoadingFeed = false;
+let hasMoreFeedPosts = true;
 
 // ---------- Page setup ----------
 window.onload = async () => {
@@ -792,12 +796,32 @@ async function setupFeedPage() {
     }
 
     renderUserHeader(currentUser);
-    loadFeedPosts();
+
+    // Reset feed state whenever page loads
+    feedOffset = 0;
+    feedLimit = 10;
+    isLoadingFeed = false;
+    hasMoreFeedPosts = true;
+    feedContainer.innerHTML = "";
+
+    await loadFeedPosts();
+
+    window.removeEventListener("scroll", handleFeedScroll);
+    window.addEventListener("scroll", handleFeedScroll);
 }
 
 async function loadFeedPosts() {
+    if (isLoadingFeed || !hasMoreFeedPosts) return;
+
+    isLoadingFeed = true;
+
+    const loadingEl = document.getElementById("feed-loading");
+    if (loadingEl) {
+        loadingEl.style.display = "block";
+    }
+
     try {
-        const response = await fetch("/posts", {
+        const response = await fetch(`/posts?skip=${feedOffset}&limit=${feedLimit}`, {
             headers: getAuthHeaders(false)
         });
 
@@ -807,19 +831,50 @@ async function loadFeedPosts() {
         }
 
         const posts = await response.json();
-        renderFeedPosts(posts);
+
+        if (posts.length < feedLimit) {
+            hasMoreFeedPosts = false;
+
+            const endEl = document.getElementById("feed-end");
+            if (endEl) {
+                endEl.style.display = "block";
+            }
+        }
+        if (!hasMoreFeedPosts && loadingEl) {
+            loadingEl.style.display = "none";
+        }
+
+        appendFeedPosts(posts);
+        feedOffset += posts.length;
     } catch (error) {
         console.error("Error loading posts:", error);
+    } finally {
+        isLoadingFeed = false;
+
+        if (loadingEl) {
+            loadingEl.style.display = "none";
+        }
     }
 }
 
-function renderFeedPosts(posts) {
+function handleFeedScroll() {
+    if (isLoadingFeed || !hasMoreFeedPosts) return;
+
+    const scrollTop = window.scrollY;
+    const windowHeight = window.innerHeight;
+    const documentHeight = document.documentElement.scrollHeight;
+
+    // Trigger when user gets near the bottom
+    if (scrollTop + windowHeight >= documentHeight - 250) {
+        loadFeedPosts();
+    }
+}
+
+function appendFeedPosts(posts) {
     const container = document.getElementById("feed-posts");
     if (!container) return;
 
-    container.innerHTML = "";
-
-    if (posts.length === 0) {
+    if (posts.length === 0 && feedOffset === 0) {
         container.innerHTML = `
             <p class="empty-label">No posts yet. Be the first to post.</p>
         `;
@@ -829,6 +884,8 @@ function renderFeedPosts(posts) {
     const currentUser = getCurrentUser();
 
     posts.forEach((post, postIndex) => {
+        const globalIndex = feedOffset + postIndex;
+
         const card = document.createElement("article");
         card.className = "feed-post-card";
 
@@ -838,16 +895,16 @@ function renderFeedPosts(posts) {
 
         const imagesHtml = hasImages
             ? `
-                <div class="feed-carousel" id="feed-carousel-${postIndex}" data-index="0" data-total="${post.images.length}">
-                    ${multipleImages ? `<button type="button" class="carousel-btn prev-btn" onclick="changeSlide(${postIndex}, -1, event)">‹</button>` : ""}
+                <div class="feed-carousel" id="feed-carousel-${globalIndex}" data-index="0" data-total="${post.images.length}">
+                    ${multipleImages ? `<button type="button" class="carousel-btn prev-btn" onclick="changeSlide(${globalIndex}, -1, event)">‹</button>` : ""}
                     
-                    <div class="feed-carousel-track" id="carousel-track-${postIndex}">
+                    <div class="feed-carousel-track" id="carousel-track-${globalIndex}">
                         ${post.images.map(image => `
                             <img src="${image}" class="feed-post-image" alt="Post image" draggable="false">
                         `).join("")}
                     </div>
 
-                    ${multipleImages ? `<button type="button" class="carousel-btn next-btn" onclick="changeSlide(${postIndex}, 1, event)">›</button>` : ""}
+                    ${multipleImages ? `<button type="button" class="carousel-btn next-btn" onclick="changeSlide(${globalIndex}, 1, event)">›</button>` : ""}
                 </div>
 
                 ${multipleImages ? `
@@ -856,8 +913,8 @@ function renderFeedPosts(posts) {
                             <button
                                 type="button"
                                 class="carousel-dot ${imageIndex === 0 ? "active-dot" : ""}"
-                                id="dot-${postIndex}-${imageIndex}"
-                                onclick="goToSlide(${postIndex}, ${imageIndex}, event)">
+                                id="dot-${globalIndex}-${imageIndex}"
+                                onclick="goToSlide(${globalIndex}, ${imageIndex}, event)">
                             </button>
                         `).join("")}
                     </div>
