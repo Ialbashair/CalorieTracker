@@ -419,6 +419,10 @@ def tracker_page():
     return FileResponse("static/index.html")
 
 
+@app.get("/viz")
+def visualization_page():
+    return FileResponse("static/visualization.html")
+
 @app.get("/admin")
 def admin_page():
     return FileResponse("static/admin.html")

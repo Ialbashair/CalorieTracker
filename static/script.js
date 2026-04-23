@@ -9,6 +9,7 @@ window.onload = async () => {
     setupLoginForm();
     await setupCaloriePage();
     await setupAdminPage();
+    await setupVisualizationPage();
 };
 
 // ---------- Auth helpers ----------
@@ -217,8 +218,115 @@ async function setupCaloriePage() {
     loadExerciseLogs();
 }
 
+// ---------- Visualization page ----------
+async function setupVisualizationPage() {
+    const graphContainer = document.getElementById("graph-container");
+
+    if (!graphContainer) return;
+
+    const token = getToken();
+    if (!token) {
+        window.location.href = "/login";
+        return;
+    }
+
+    const currentUser = await fetchCurrentUserFromToken();
+    if (!currentUser) {
+        logoutUser();
+        return;
+    }
+
+    renderUserHeader(currentUser);
+
+    let food     = await fetchFoodLogs();
+    let exercise = await fetchExerciseLogs();
+
+    let total_timestamps = [];
+    let total_calories   = [];
+
+    let fi = 0;
+    let ei = 0;
+    let total = 0;
+    while (fi < food.length || ei < exercise.length) {
+        let ft = (fi < food.length)     ? Date.parse(food[fi].created_at)     : null;
+        let et = (ei < exercise.length) ? Date.parse(exercise[fi].created_at) : null;
+
+        if (et === null || ft < et) {
+            total += food[fi].calories;
+            total_timestamps.push(food[fi].created_at);
+            fi += 1;
+        }
+        else if (ft === null || et < ft) {
+            total -= exercise[ei].calories_burned;
+            total_timestamps.push(exercise[ei].created_at);
+            ei += 1;
+        }
+        else {
+            total += food[fi].calories - exercise[ei].calories_burned;
+            total_timestamps.push(food[fi].created_at);
+            ft += 1;
+            ei += 1;
+        }
+
+        total_calories.push(total);
+    }
+
+    let gained = {
+        x: food.map(x => x.created_at),
+        y: food.map(x => x.calories),
+        // text: []
+        type: "scatter",
+        name: "gained",
+        marker: {
+            color: "green",
+        },
+    };
+
+    let burned = {
+        x: exercise.map(x => x.created_at),
+        y: exercise.map(x => x.calories_burned),
+        type: "scatter",
+        name: "burned",
+        marker: {
+            color: "red",
+        },
+    };
+
+    let total_line = {
+        x: total_timestamps,
+        y: total_calories,
+        type: "scatter",
+        name: "total",
+        marker: {
+            color: "grey",
+        },
+    };
+
+    let data = [gained, burned, total_line];
+
+    let layout = {
+        title: {
+            text: "Calories Burned/Gained",
+        },
+    }
+
+    let config = {
+        scrollZoom: true,
+    }
+
+    Plotly.newPlot(graphContainer, data, layout, config);
+}
+
 // ---------- Food section ----------
 async function loadFoodLogs() {
+    let data = await fetchFoodLogs();
+
+    if (data !== null) {
+        renderFoodList(data);
+    }
+}
+
+async function fetchFoodLogs() {
     try {
         const response = await fetch("/food-logs", {
             headers: getAuthHeaders(false)
@@ -230,9 +338,10 @@ async function loadFoodLogs() {
         }
 
         const data = await response.json();
-        renderFoodList(data);
+        return data;
     } catch (error) {
         console.error("Error fetching food logs:", error);
+        return null;
     }
 }
 
@@ -405,8 +514,8 @@ async function addFoodEntry() {
         if (response.ok) {
             closeAddFoodModal();
             loadFoodLogs();
-            closeAddFoodModal();
-            loadFoodLogs();
+            // closeAddFoodModal();
+            // loadFoodLogs();
         } else {
             const data = await response.json();
             errorEl.textContent = data.detail || "Failed to log food.";
@@ -470,6 +579,14 @@ async function confirmDeleteFood() {
 
 // ---------- Exercise section ----------
 async function loadExerciseLogs() {
+    let data = await fetchExerciseLogs();
+
+    if (data !== null) {
+        renderExerciseList(data);
+    }
+}
+
+async function fetchExerciseLogs() {
     try {
         const response = await fetch("/exercise-logs", {
             headers: getAuthHeaders(false)
@@ -481,9 +598,10 @@ async function loadExerciseLogs() {
         }
 
         const data = await response.json();
-        renderExerciseList(data);
+        return data;
     } catch (error) {
         console.error("Error fetching exercise logs:", error);
+        return null;
     }
 }
 
@@ -705,8 +823,8 @@ async function addExerciseEntry() {
         if (response.ok) {
             closeAddExerciseModal();
             loadExerciseLogs();
-            closeAddExerciseModal();
-            loadExerciseLogs();
+            // closeAddExerciseModal();
+            // loadExerciseLogs();
         } else {
             const data = await response.json();
             errorEl.textContent = data.detail || "Failed to log exercise.";
