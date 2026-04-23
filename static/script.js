@@ -235,6 +235,10 @@ async function setupHomePage() {
 
     renderUserHeader(currentUser);
     usernameEl.textContent = currentUser.username;
+    const homeProfilePictureEl = document.getElementById("home-profile-picture");
+    if (homeProfilePictureEl) {
+        homeProfilePictureEl.innerHTML = getProfileAvatarHtml(currentUser, "avatar-large");
+    }
 
     if (currentUser.created_at) {
         const date = new Date(currentUser.created_at);
@@ -1151,9 +1155,7 @@ function appendFeedPosts(posts) {
 
         card.innerHTML = `
             <div class="feed-post-header">
-                <div class="feed-user-avatar">
-                    ${post.username.charAt(0).toUpperCase()}
-                </div>
+                ${getProfileAvatarHtml(post)}
                 <div>
                     <div class="feed-username">${escapeHtml(post.username)}</div>
                     <div class="feed-post-date">${formatPostDate(post.created_at)}</div>
@@ -1515,9 +1517,7 @@ function renderProfilePosts(posts) {
 
         card.innerHTML = `
             <div class="feed-post-header">
-                <div class="feed-user-avatar">
-                    ${post.username.charAt(0).toUpperCase()}
-                </div>
+                ${getProfileAvatarHtml(post)}
                 <div>
                     <div class="feed-username">${escapeHtml(post.username)}</div>
                     <div class="feed-post-date">${formatPostDate(post.created_at)}</div>
@@ -1697,6 +1697,7 @@ async function setupSettingsPage() {
     if (themeSelect) {
         themeSelect.value = localStorage.getItem("nutriTheme") || "light";
     }
+    populateProfilePicturePreview(currentUser);
 }
 
 async function submitUsernameChange() {
@@ -1793,6 +1794,71 @@ async function submitPasswordChange() {
     }
 }
 
+async function submitProfilePicture() {
+    const input = document.getElementById("settings-profile-picture-input");
+    const messageEl = document.getElementById("settings-profile-picture-message");
+
+    if (!input || !messageEl) return;
+
+    const file = input.files?.[0];
+    if (!file) {
+        messageEl.textContent = "Please choose an image.";
+        messageEl.style.color = "red";
+        return;
+    }
+
+    const formData = new FormData();
+    formData.append("image", file);
+
+    try {
+        const response = await fetch("/settings/profile-picture", {
+            method: "POST",
+            headers: {
+                "Authorization": `Bearer ${getToken()}`
+            },
+            body: formData
+        });
+
+        if (response.status === 401) {
+            logoutUser();
+            return;
+        }
+
+        const data = await response.json();
+
+        if (response.ok) {
+            localStorage.setItem("nutriUser", JSON.stringify(data));
+            messageEl.textContent = "Profile picture updated successfully.";
+            messageEl.style.color = "green";
+
+            renderUserHeader(data);
+            populateProfilePicturePreview(data);
+            updateHomeProfilePicture(data);
+        } else {
+            messageEl.textContent = data.detail || "Failed to upload profile picture.";
+            messageEl.style.color = "red";
+        }
+    } catch (error) {
+        console.error("Error uploading profile picture:", error);
+        messageEl.textContent = "Something went wrong.";
+        messageEl.style.color = "red";
+    }
+}
+
+function updateHomeProfilePicture(user) {
+    const homeProfilePictureEl = document.getElementById("home-profile-picture");
+    if (!homeProfilePictureEl || !user) return;
+
+    homeProfilePictureEl.innerHTML = getProfileAvatarHtml(user, "avatar-large");
+}
+
+function populateProfilePicturePreview(user) {
+    const previewContainer = document.getElementById("settings-profile-preview");
+    if (!previewContainer || !user) return;
+
+    previewContainer.innerHTML = getProfileAvatarHtml(user, "avatar-large");
+}
+
 // ---------- Small helper ----------
 function escapeHtml(value) {
     return String(value)
@@ -1801,4 +1867,25 @@ function escapeHtml(value) {
         .replaceAll(">", "&gt;")
         .replaceAll('"', "&quot;")
         .replaceAll("'", "&#39;");
+}
+function getProfileAvatarHtml(user, sizeClass = "") {
+    const username = user?.username || "U";
+    const firstLetter = username.charAt(0).toUpperCase();
+    const profilePicture = user?.profile_picture;
+
+    if (profilePicture) {
+        return `
+            <img
+                src="${profilePicture}"
+                alt="${escapeHtml(username)} profile picture"
+                class="avatar-image ${sizeClass}"
+            >
+        `;
+    }
+
+    return `
+        <div class="avatar-fallback ${sizeClass}">
+            ${escapeHtml(firstLetter)}
+        </div>
+    `;
 }

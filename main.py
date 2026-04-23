@@ -21,6 +21,8 @@ app = FastAPI()
 # Creates an uploads folder
 UPLOAD_DIR = "static/uploads/posts"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
+USER_UPLOAD_DIR = "static/uploads/profile_pictures"
+os.makedirs(USER_UPLOAD_DIR, exist_ok=True)
 
 # ---------- Settings ----------
 class AppSettings(BaseSettings):
@@ -120,6 +122,7 @@ class UserOut(BaseModel):
     email: str
     role: str
     created_at: Optional[str] = None
+    profile_picture: Optional[str] = None
 
 
 class UserRoleUpdate(BaseModel):
@@ -168,6 +171,7 @@ class PostOut(BaseModel):
     id: str
     user_id: str
     username: str
+    profile_picture: Optional[str] = None
     caption: str
     images: List[str]
     likes: int
@@ -200,7 +204,8 @@ def serialize_user(user) -> dict:
         "username": user["username"],
         "email": user["email"],
         "role": user["role"],
-        "created_at": user["created_at"].isoformat() if "created_at" in user and user["created_at"] else None
+        "created_at": user["created_at"].isoformat() if "created_at" in user and user["created_at"] else None,
+        "profile_picture": user.get("profile_picture")
     }
 
 
@@ -228,6 +233,7 @@ def serialize_post(post) -> dict:
         "id": str(post["_id"]),
         "user_id": post["user_id"],
         "username": post["username"],
+        "profile_picture": post.get("profile_picture"),
         "caption": post["caption"],
         "images": post["images"],
         "likes": post.get("likes", 0),
@@ -431,13 +437,13 @@ def create_post(
     post_dict = {
         "user_id": str(current_user["_id"]),
         "username": current_user["username"],
+        "profile_picture": current_user.get("profile_picture"),
         "caption": caption,
         "images": saved_paths,
         "created_at": datetime.now(timezone.utc),
         "likes": 0,
         "liked_by": []
     }
-
     result = posts_collection.insert_one(post_dict)
     new_post = posts_collection.find_one({"_id": result.inserted_id})
 
@@ -622,6 +628,43 @@ def archive_exercise_log(log_id: str, current_user=Depends(get_current_user)):
     exercise_logs_collection.delete_one({"_id": ObjectId(log_id)})
 
     return
+
+@app.post("/settings/profile-picture", response_model=UserOut)
+def upload_profile_picture(
+    image: UploadFile = File(...),
+    current_user=Depends(get_current_user)
+):
+    allowed_types = {"image/jpeg", "image/png", "image/webp"}
+
+    if image.content_type not in allowed_types:
+        raise HTTPException(status_code=400, detail="Only JPG, PNG, and WEBP images are allowed.")
+
+    # delete old profile picture if one exists
+    old_path = current_user.get("profile_picture")
+    if old_path:
+        local_old_path = old_path.lstrip("/")
+        if os.path.exists(local_old_path):
+            try:
+                os.remove(local_old_path)
+            except OSError:
+                pass
+
+    ext = os.path.splitext(image.filename)[1].lower()
+    unique_name = f"{uuid4().hex}{ext}"
+    file_path = os.path.join(USER_UPLOAD_DIR, unique_name)
+
+    with open(file_path, "wb") as buffer:
+        shutil.copyfileobj(image.file, buffer)
+
+    public_path = f"/static/uploads/profile_pictures/{unique_name}"
+
+    users_collection.update_one(
+        {"_id": current_user["_id"]},
+        {"$set": {"profile_picture": public_path}}
+    )
+
+    updated_user = users_collection.find_one({"_id": current_user["_id"]})
+    return serialize_user(updated_user)
 
 
 # ---------- Admin routes ----------

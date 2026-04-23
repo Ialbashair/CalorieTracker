@@ -676,6 +676,61 @@ button:active {
     transform: scale(0.96);
 }
 
+.settings-profile-preview {
+    display: flex;
+    justify-content: center;
+    margin-bottom: 8px;
+}
+
+.settings-profile-image,
+.home-profile-image,
+.feed-user-avatar-image {
+    width: 96px;
+    height: 96px;
+    object-fit: cover;
+    border-radius: 999px;
+    border: 2px solid var(--border);
+}
+
+.settings-profile-fallback {
+    width: 96px;
+    height: 96px;
+    border-radius: 999px;
+    background: #eef2ff;
+    color: var(--primary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 2rem;
+    font-weight: 700;
+    border: 2px solid var(--border);
+}
+
+.avatar-image,
+.avatar-fallback {
+    width: 42px;
+    height: 42px;
+    border-radius: 999px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    object-fit: cover;
+    border: 2px solid var(--border);
+    flex-shrink: 0;
+}
+
+.avatar-fallback {
+    background: #eef2ff;
+    color: var(--primary);
+    font-weight: 700;
+}
+
+.avatar-large {
+    width: 96px;
+    height: 96px;
+    font-size: 2rem;
+}
+
 .auth-message {
     margin: 0;
     font-size: 0.95rem;
@@ -839,6 +894,11 @@ body.dark-mode .carousel-dot {
 
 body.dark-mode .active-dot {
     background: var(--primary);
+}
+
+body.dark-mode .avatar-fallback {
+    background: #111827;
+    border-color: var(--border);
 }
 
 .home-profile-card {
