@@ -68,6 +68,18 @@
         </div>
     </div>
 
+    <!-- Delete Food Modal -->
+    <div id="delete-food-modal" class="modal">
+        <div class="modal-content">
+            <h3>Delete Food</h3>
+            <p>Are you sure you want to delete this food log?</p>
+            <div class="modal-actions">
+                <button onclick="confirmDeleteFood()" class="delete-confirm-btn">Delete</button>
+                <button onclick="closeDeleteFoodModal()" class="cancel-btn">Cancel</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Add Exercise Modal -->
     <div id="add-exercise-modal" class="modal">
         <div class="modal-content">
@@ -81,6 +93,18 @@
             <div class="modal-actions">
                 <button onclick="addExerciseEntry()" class="save-btn">Add</button>
                 <button onclick="closeAddExerciseModal()" class="cancel-btn">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Delete Exercise Modal -->
+    <div id="delete-exercise-modal" class="modal">
+        <div class="modal-content">
+            <h3>Delete Exercise</h3>
+            <p>Are you sure you want to delete this exercise log?</p>
+            <div class="modal-actions">
+                <button onclick="confirmDeleteExercise()" class="delete-confirm-btn">Delete</button>
+                <button onclick="closeDeleteExerciseModal()" class="cancel-btn">Cancel</button>
             </div>
         </div>
     </div>
