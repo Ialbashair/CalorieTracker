@@ -386,3 +386,12 @@ def tracker_page():
 @app.get("/admin")
 def admin_page():
     return FileResponse("static/admin.html")
+
+@app.get("/stats")
+def stats_page():
+    return FileResponse("static/stats.html")
+
+
+@app.get("/feed")
+def feed_page():
+    return FileResponse("static/feed.html")

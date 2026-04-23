@@ -159,35 +159,21 @@ function setupLoginForm() {
 
 // ---------- Shared header ----------
 function renderUserHeader(user) {
-    const header = document.querySelector("header");
-    if (!header || !user) return;
+    const userBar = document.getElementById("user-bar");
+    const adminTab = document.getElementById("admin-tab");
 
-    let userBar = document.getElementById("user-bar");
+    if (!userBar || !user) return;
 
-    if (!userBar) {
-        userBar = document.createElement("div");
-        userBar.id = "user-bar";
-        userBar.style.marginTop = "10px";
-        userBar.style.display = "flex";
-        userBar.style.justifyContent = "space-between";
-        userBar.style.alignItems = "center";
-        userBar.style.gap = "10px";
-
-        header.appendChild(userBar);
+    if (adminTab) {
+        adminTab.style.display = user.role === "admin" ? "inline-flex" : "none";
     }
 
-    const isAdminPage = window.location.pathname === "/admin";
-
-    const navLink = user.role === "admin"
-        ? isAdminPage
-            ? `<a href="/tracker" style="font-weight:600; color: var(--primary); text-decoration:none;">Tracker</a>`
-            : `<a href="/admin" style="font-weight:600; color: var(--primary); text-decoration:none;">Admin</a>`
-        : "";
-
     userBar.innerHTML = `
-        <span>Logged in as <strong>${escapeHtml(user.username)}</strong> (${escapeHtml(user.role)})</span>
-        <div style="display:flex; gap:10px; align-items:center;">
-            ${navLink}
+        <div>
+            Logged in as <strong>${escapeHtml(user.username)}</strong>
+        </div>
+        <div class="user-bar-right">
+            <span class="user-role-pill">${escapeHtml(user.role)}</span>
             <button onclick="logoutUser()">Logout</button>
         </div>
     `;
