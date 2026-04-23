@@ -395,3 +395,281 @@ button:active {
 .exercise-btn {
     background-color: var(--secondary);
 }
+
+.feed-container {
+    max-width: 760px;
+}
+
+.sub-tabs {
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+    margin-top: 8px;
+    margin-bottom: 10px;
+    flex-wrap: wrap;
+}
+
+.sub-tab-link {
+    text-decoration: none;
+    color: var(--text);
+    background: white;
+    border: 1px solid var(--border);
+    padding: 8px 16px;
+    border-radius: 999px;
+    font-weight: 600;
+    transition: all 0.2s ease;
+}
+
+.sub-tab-link:hover {
+    background: #eef2ff;
+    color: var(--primary);
+}
+
+.active-sub-tab {
+    background: var(--secondary);
+    color: white;
+    border-color: var(--secondary);
+}
+
+.feed-posts {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    margin-top: 10px;
+}
+
+.feed-post-card {
+    background: white;
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    overflow: hidden;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.04);
+}
+
+.feed-post-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 16px;
+}
+
+.feed-user-avatar {
+    width: 42px;
+    height: 42px;
+    border-radius: 999px;
+    background: #eef2ff;
+    color: var(--primary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+}
+
+.feed-username {
+    font-weight: 700;
+    color: var(--text);
+}
+
+.feed-post-date {
+    font-size: 0.85rem;
+    color: #6b7280;
+}
+
+.feed-post-image {
+    width: 100%;
+    height: 320px;
+    object-fit: cover;
+    border-top: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+}
+
+.feed-post-body {
+    padding: 16px;
+}
+
+.feed-post-caption {
+    margin: 0;
+    line-height: 1.5;
+    color: var(--text);
+}
+
+.post-create-card {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    background: white;
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 20px;
+}
+
+.post-create-user {
+    font-size: 1rem;
+    color: var(--text);
+}
+
+#post-caption {
+    min-height: 120px;
+    resize: vertical;
+    padding: 12px 15px;
+    border: 2px solid var(--border);
+    border-radius: 8px;
+    font-size: 1rem;
+    font-family: inherit;
+}
+
+.post-image-preview {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    gap: 10px;
+}
+
+.post-image-preview img {
+    width: 100%;
+    height: 120px;
+    object-fit: cover;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+}
+
+.helper-text {
+    font-size: 0.9rem;
+    color: #6b7280;
+    margin: 0;
+}
+
+.feed-carousel {
+    position: relative;
+    overflow: hidden;
+    border-top: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+    background: #f3f4f6;
+}
+
+.feed-carousel-track {
+    display: flex;
+    transition: transform 0.3s ease-in-out;
+    will-change: transform;
+}
+
+.feed-post-image {
+    width: 100%;
+    height: 320px;
+    object-fit: cover;
+    flex: 0 0 100%;
+    display: block;
+    user-select: none;
+    -webkit-user-drag: none;
+}
+
+.carousel-btn {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    z-index: 20;
+    width: 40px;
+    height: 40px;
+    border-radius: 999px;
+    background: rgba(0, 0, 0, 0.5);
+    color: white;
+    font-size: 1.4rem;
+    font-weight: 700;
+    border: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+}
+
+.prev-btn {
+    left: 12px;
+}
+
+.next-btn {
+    right: 12px;
+}
+
+.carousel-dots {
+    display: flex;
+    justify-content: center;
+    gap: 8px;
+    padding: 12px 0 4px;
+}
+
+.carousel-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 999px;
+    background: #d1d5db;
+    border: none;
+    cursor: pointer;
+    padding: 0;
+}
+
+.active-dot {
+    background: var(--primary);
+}
+
+.feed-post-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-top: 8px;
+}
+
+.like-btn {
+    font-size: 1.4rem;
+    background: none;
+    border: none;
+    cursor: pointer;
+    transition: transform 0.15s ease;
+}
+
+.like-btn:hover {
+    transform: scale(1.15);
+}
+
+.like-btn.liked {
+    transform: scale(1.2);
+}
+
+.like-count {
+    font-weight: 600;
+    color: var(--text);
+}
+.feed-post-actions {
+    flex-wrap: wrap;
+}
+
+.profile-stats-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 15px;
+    margin-top: 10px;
+}
+
+.profile-stat-card {
+    background: white;
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 20px;
+    text-align: center;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.04);
+}
+
+.profile-stat-value {
+    font-size: 2rem;
+    font-weight: 800;
+    color: var(--primary);
+}
+
+.profile-stat-label {
+    margin-top: 6px;
+    color: #6b7280;
+    font-weight: 600;
+}
+.section-subtext {
+    margin: 6px 0 0;
+    color: #6b7280;
+    font-size: 0.95rem;
+}

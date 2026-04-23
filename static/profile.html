@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nutri - Social Feed</title>
+    <title>Nutri - Profile</title>
     <link rel="icon" type="image/x-icon" href="/static/favicon.ico">
     <link rel="stylesheet" href="/static/style.css">
     <script src="/static/script.js" defer></script>
@@ -16,7 +16,6 @@
                 <h1>Nutri</h1>
             </div>
 
-            <!-- Main app tabs -->
             <nav class="page-tabs">
                 <a href="/tracker" class="tab-link">Tracker</a>
                 <a href="/stats" class="tab-link">Stats</a>
@@ -26,20 +25,39 @@
 
             <div id="user-bar" class="user-bar"></div>
 
-            <!-- Feed-specific tabs -->
             <nav class="sub-tabs">
-                <a href="/feed" class="sub-tab-link active-sub-tab">Feed</a>
+                <a href="/feed" class="sub-tab-link">Feed</a>
                 <a href="/feed/create" class="sub-tab-link">Create New Post +</a>
-                <a href="/feed/profile" class="sub-tab-link">Profile</a>
+                <a href="/feed/profile" class="sub-tab-link active-sub-tab">Profile</a>
             </nav>
         </header>
 
         <section class="section">
             <div class="section-header">
-                <h2>Recent Posts</h2>
+                <h2 id="profile-username">My Profile</h2>
             </div>
 
-            <div id="feed-posts" class="feed-posts"></div>
+            <div class="profile-stats-grid">
+                <div class="profile-stat-card">
+                    <div class="profile-stat-value" id="profile-post-count">0</div>
+                    <div class="profile-stat-label">Posts</div>
+                </div>
+                <div class="profile-stat-card">
+                    <div class="profile-stat-value" id="profile-total-likes">0</div>
+                    <div class="profile-stat-label">Total Likes</div>
+                </div>
+            </div>
+        </section>
+
+        <section class="section">
+            <div class="section-header">
+                <div>
+                    <h2>Manage Your Posts</h2>
+                    <p class="section-subtext">Edit or delete your posts here. The main feed is view-only.</p>
+                </div>
+            </div>
+
+            <div id="profile-posts" class="feed-posts"></div>
         </section>
     </div>
 </body>

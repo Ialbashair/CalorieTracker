@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nutri - Social Feed</title>
+    <title>Nutri - Create Post</title>
     <link rel="icon" type="image/x-icon" href="/static/favicon.ico">
     <link rel="stylesheet" href="/static/style.css">
     <script src="/static/script.js" defer></script>
@@ -16,7 +16,6 @@
                 <h1>Nutri</h1>
             </div>
 
-            <!-- Main app tabs -->
             <nav class="page-tabs">
                 <a href="/tracker" class="tab-link">Tracker</a>
                 <a href="/stats" class="tab-link">Stats</a>
@@ -26,20 +25,37 @@
 
             <div id="user-bar" class="user-bar"></div>
 
-            <!-- Feed-specific tabs -->
             <nav class="sub-tabs">
-                <a href="/feed" class="sub-tab-link active-sub-tab">Feed</a>
-                <a href="/feed/create" class="sub-tab-link">Create New Post +</a>
+                <a href="/feed" class="sub-tab-link">Feed</a>
+                <a href="/feed/create" class="sub-tab-link active-sub-tab">Create New Post +</a>
                 <a href="/feed/profile" class="sub-tab-link">Profile</a>
             </nav>
         </header>
 
         <section class="section">
             <div class="section-header">
-                <h2>Recent Posts</h2>
+                <h2>Create New Post</h2>
             </div>
 
-            <div id="feed-posts" class="feed-posts"></div>
+            <div class="post-create-card">
+                <div class="post-create-user">
+                    <strong id="create-post-username">Username</strong>
+                </div>
+
+                <input type="file" id="post-images" accept="image/*" multiple>
+                <p class="helper-text">Upload between 1 and 5 images.</p>
+
+                <div id="post-image-preview" class="post-image-preview"></div>
+
+                <textarea id="post-caption" placeholder="Write a caption..."></textarea>
+
+                <p id="create-post-message" class="auth-message"></p>
+
+                <div class="modal-actions">
+                    <button class="save-btn" onclick="submitPost()">Post</button>
+                    <button class="cancel-btn" onclick="window.location.href='/feed'">Cancel</button>
+                </div>
+            </div>
         </section>
     </div>
 </body>

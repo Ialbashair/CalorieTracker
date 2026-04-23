@@ -9,6 +9,9 @@ window.onload = async () => {
     setupLoginForm();
     await setupCaloriePage();
     await setupAdminPage();
+    await setupCreatePostPage();
+    await setupFeedPage();
+    await setupProfilePage();
 };
 
 // ---------- Auth helpers ----------
@@ -770,6 +773,594 @@ async function deleteAdminUser(userId) {
         alert("Something went wrong.");
     }
 }
+// ---------- Social Feed ----------
+async function setupFeedPage() {
+    const feedContainer = document.getElementById("feed-posts");
+
+    if (!feedContainer) return;
+
+    const token = getToken();
+    if (!token) {
+        window.location.href = "/login";
+        return;
+    }
+
+    const currentUser = await fetchCurrentUserFromToken();
+    if (!currentUser) {
+        logoutUser();
+        return;
+    }
+
+    renderUserHeader(currentUser);
+    loadFeedPosts();
+}
+
+async function loadFeedPosts() {
+    try {
+        const response = await fetch("/posts", {
+            headers: getAuthHeaders(false)
+        });
+
+        if (response.status === 401) {
+            logoutUser();
+            return;
+        }
+
+        const posts = await response.json();
+        renderFeedPosts(posts);
+    } catch (error) {
+        console.error("Error loading posts:", error);
+    }
+}
+
+function renderFeedPosts(posts) {
+    const container = document.getElementById("feed-posts");
+    if (!container) return;
+
+    container.innerHTML = "";
+
+    if (posts.length === 0) {
+        container.innerHTML = `
+            <p class="empty-label">No posts yet. Be the first to post.</p>
+        `;
+        return;
+    }
+
+    const currentUser = getCurrentUser();
+
+    posts.forEach((post, postIndex) => {
+        const card = document.createElement("article");
+        card.className = "feed-post-card";
+
+        const hasImages = post.images && post.images.length > 0;
+        const multipleImages = hasImages && post.images.length > 1;
+        const isLiked = post.liked_by && currentUser && post.liked_by.includes(currentUser.id);
+
+        const imagesHtml = hasImages
+            ? `
+                <div class="feed-carousel" id="feed-carousel-${postIndex}" data-index="0" data-total="${post.images.length}">
+                    ${multipleImages ? `<button type="button" class="carousel-btn prev-btn" onclick="changeSlide(${postIndex}, -1, event)">‹</button>` : ""}
+                    
+                    <div class="feed-carousel-track" id="carousel-track-${postIndex}">
+                        ${post.images.map(image => `
+                            <img src="${image}" class="feed-post-image" alt="Post image" draggable="false">
+                        `).join("")}
+                    </div>
+
+                    ${multipleImages ? `<button type="button" class="carousel-btn next-btn" onclick="changeSlide(${postIndex}, 1, event)">›</button>` : ""}
+                </div>
+
+                ${multipleImages ? `
+                    <div class="carousel-dots">
+                        ${post.images.map((_, imageIndex) => `
+                            <button
+                                type="button"
+                                class="carousel-dot ${imageIndex === 0 ? "active-dot" : ""}"
+                                id="dot-${postIndex}-${imageIndex}"
+                                onclick="goToSlide(${postIndex}, ${imageIndex}, event)">
+                            </button>
+                        `).join("")}
+                    </div>
+                ` : ""}
+            `
+            : `<div class="feed-post-image-placeholder">No Image</div>`;
+
+        card.innerHTML = `
+            <div class="feed-post-header">
+                <div class="feed-user-avatar">
+                    ${post.username.charAt(0).toUpperCase()}
+                </div>
+                <div>
+                    <div class="feed-username">${escapeHtml(post.username)}</div>
+                    <div class="feed-post-date">${formatPostDate(post.created_at)}</div>
+                </div>
+            </div>
+
+            ${imagesHtml}
+
+            <div class="feed-post-body">
+                <p class="feed-post-caption" id="caption-${post.id}">${escapeHtml(post.caption)}</p>
+
+                <div class="feed-post-actions">
+                    <button 
+                        type="button"
+                        class="like-btn ${isLiked ? "liked" : ""}" 
+                        onclick="toggleLike('${post.id}', this)">
+                        ${isLiked ? "❤️" : "🤍"}
+                    </button>
+                    <span class="like-count">${post.likes || 0}</span>
+                </div>
+            </div>
+        `;
+
+        container.appendChild(card);
+    });
+}
+
+function changeSlide(postIndex, direction, event) {
+    if (event) {
+        event.preventDefault();
+        event.stopPropagation();
+    }
+
+    const carousel = document.getElementById(`feed-carousel-${postIndex}`);
+    const track = document.getElementById(`carousel-track-${postIndex}`);
+    if (!carousel || !track) return;
+
+    const total = parseInt(carousel.dataset.total || "0", 10);
+    if (total <= 1) return;
+
+    let currentIndex = parseInt(carousel.dataset.index || "0", 10);
+    currentIndex = (currentIndex + direction + total) % total;
+
+    carousel.dataset.index = String(currentIndex);
+    updateCarousel(postIndex, currentIndex);
+}
+
+function goToSlide(postIndex, slideIndex, event) {
+    if (event) {
+        event.preventDefault();
+        event.stopPropagation();
+    }
+
+    const carousel = document.getElementById(`feed-carousel-${postIndex}`);
+    if (!carousel) return;
+
+    carousel.dataset.index = String(slideIndex);
+    updateCarousel(postIndex, slideIndex);
+}
+
+function updateCarousel(postIndex, currentIndex) {
+    const track = document.getElementById(`carousel-track-${postIndex}`);
+    if (!track) return;
+
+    const slides = track.querySelectorAll(".feed-post-image");
+    if (!slides.length) return;
+
+    track.style.transform = `translateX(-${currentIndex * 100}%)`;
+
+    slides.forEach((_, index) => {
+        const dot = document.getElementById(`dot-${postIndex}-${index}`);
+        if (dot) {
+            dot.classList.toggle("active-dot", index === currentIndex);
+        }
+    });
+}
+
+async function toggleLike(postId, button) {
+    try {
+        const response = await fetch(`/posts/${postId}/like`, {
+            method: "POST",
+            headers: getAuthHeaders(false)
+        });
+
+        if (response.status === 401) {
+            logoutUser();
+            return;
+        }
+
+        const data = await response.json();
+
+        if (response.ok) {
+            const liked = data.liked;
+            const likes = data.likes;
+
+            // Update button UI
+            button.textContent = liked ? "❤️" : "🤍";
+            button.classList.toggle("liked", liked);
+
+            // Update count
+            const countEl = button.nextElementSibling;
+            if (countEl) {
+                countEl.textContent = likes;
+            }
+        }
+    } catch (error) {
+        console.error("Error liking post:", error);
+    }
+}
+
+// ---------- Social Feed/Create new Post page ----------
+async function setupCreatePostPage() {
+    const usernameEl = document.getElementById("create-post-username");
+    const imageInput = document.getElementById("post-images");
+
+    if (!usernameEl || !imageInput) return;
+
+    const token = getToken();
+    if (!token) {
+        window.location.href = "/login";
+        return;
+    }
+
+    const currentUser = await fetchCurrentUserFromToken();
+    if (!currentUser) {
+        logoutUser();
+        return;
+    }
+
+    renderUserHeader(currentUser);
+    usernameEl.textContent = currentUser.username;
+
+    imageInput.addEventListener("change", previewPostImages);
+}
+
+function previewPostImages() {
+    const imageInput = document.getElementById("post-images");
+    const preview = document.getElementById("post-image-preview");
+
+    if (!imageInput || !preview) return;
+
+    preview.innerHTML = "";
+
+    const files = Array.from(imageInput.files);
+
+    if (files.length > 5) {
+        alert("You can upload a maximum of 5 images.");
+        imageInput.value = "";
+        return;
+    }
+
+    files.forEach(file => {
+        const reader = new FileReader();
+        reader.onload = e => {
+            const img = document.createElement("img");
+            img.src = e.target.result;
+            preview.appendChild(img);
+        };
+        reader.readAsDataURL(file);
+    });
+}
+
+async function submitPost() {
+    const imageInput = document.getElementById("post-images");
+    const captionInput = document.getElementById("post-caption");
+    const message = document.getElementById("create-post-message");
+
+    if (!imageInput || !captionInput || !message) return;
+
+    const files = Array.from(imageInput.files);
+    const caption = captionInput.value.trim();
+
+    if (files.length < 1 || files.length > 5) {
+        message.textContent = "Please upload between 1 and 5 images.";
+        message.style.color = "red";
+        return;
+    }
+
+    const formData = new FormData();
+    formData.append("caption", caption);
+
+    files.forEach(file => {
+        formData.append("images", file);
+    });
+
+    try {
+        const response = await fetch("/posts", {
+            method: "POST",
+            headers: {
+                "Authorization": `Bearer ${getToken()}`
+            },
+            body: formData
+        });
+
+        const data = await response.json();
+
+        if (response.status === 401) {
+            logoutUser();
+            return;
+        }
+
+        if (response.ok) {
+            message.textContent = "Post created successfully.";
+            message.style.color = "green";
+
+            setTimeout(() => {
+                window.location.href = "/feed";
+            }, 1000);
+        } else {
+            message.textContent = data.detail || "Failed to create post.";
+            message.style.color = "red";
+        }
+    } catch (error) {
+        console.error("Error creating post:", error);
+        message.textContent = "Something went wrong.";
+        message.style.color = "red";
+    }
+}
+
+async function editPost(postId) {
+    const captionEl = document.getElementById(`caption-${postId}`);
+    if (!captionEl) return;
+
+    const currentCaption = captionEl.textContent;
+    const newCaption = prompt("Edit your caption:", currentCaption);
+
+    if (newCaption === null) return;
+
+    const trimmedCaption = newCaption.trim();
+    if (!trimmedCaption) {
+        alert("Caption cannot be empty.");
+        return;
+    }
+
+    try {
+        const response = await fetch(`/posts/${postId}`, {
+            method: "PUT",
+            headers: getAuthHeaders(),
+            body: JSON.stringify({ caption: trimmedCaption })
+        });
+
+        if (response.status === 401) {
+            logoutUser();
+            return;
+        }
+
+        const data = await response.json();
+
+        if (response.ok) {
+            captionEl.textContent = data.caption;
+        } else {
+            alert(data.detail || "Failed to update post.");
+        }
+    } catch (error) {
+        console.error("Error editing post:", error);
+        alert("Something went wrong.");
+    }
+}
+
+async function deletePost(postId) {
+    const confirmed = confirm("Are you sure you want to delete this post?");
+    if (!confirmed) return;
+
+    try {
+        const response = await fetch(`/posts/${postId}`, {
+            method: "DELETE",
+            headers: getAuthHeaders(false)
+        });
+
+        if (response.status === 401) {
+            logoutUser();
+            return;
+        }
+
+        if (response.ok) {
+            loadFeedPosts();
+        } else {
+            const data = await response.json();
+            alert(data.detail || "Failed to delete post.");
+        }
+    } catch (error) {
+        console.error("Error deleting post:", error);
+        alert("Something went wrong.");
+    }
+}
+
+//-------Social Feed/Profile Page-----
+async function setupProfilePage() {
+    const profilePosts = document.getElementById("profile-posts");
+    const profileUsername = document.getElementById("profile-username");
+    const postCountEl = document.getElementById("profile-post-count");
+    const totalLikesEl = document.getElementById("profile-total-likes");
+
+    if (!profilePosts || !profileUsername || !postCountEl || !totalLikesEl) return;
+
+    const token = getToken();
+    if (!token) {
+        window.location.href = "/login";
+        return;
+    }
+
+    const currentUser = await fetchCurrentUserFromToken();
+    if (!currentUser) {
+        logoutUser();
+        return;
+    }
+
+    renderUserHeader(currentUser);
+    profileUsername.textContent = `${currentUser.username}'s Profile`;
+
+    await loadProfileStats();
+    await loadProfilePosts();
+}
+
+async function loadProfileStats() {
+    try {
+        const response = await fetch("/my-profile-stats", {
+            headers: getAuthHeaders(false)
+        });
+
+        if (response.status === 401) {
+            logoutUser();
+            return;
+        }
+
+        const stats = await response.json();
+
+        document.getElementById("profile-post-count").textContent = stats.post_count ?? 0;
+        document.getElementById("profile-total-likes").textContent = stats.total_likes ?? 0;
+    } catch (error) {
+        console.error("Error loading profile stats:", error);
+    }
+}
+
+async function loadProfilePosts() {
+    try {
+        const response = await fetch("/my-posts", {
+            headers: getAuthHeaders(false)
+        });
+
+        if (response.status === 401) {
+            logoutUser();
+            return;
+        }
+
+        const posts = await response.json();
+        renderProfilePosts(posts);
+    } catch (error) {
+        console.error("Error loading profile posts:", error);
+    }
+}
+
+function renderProfilePosts(posts) {
+    const container = document.getElementById("profile-posts");
+    if (!container) return;
+
+    container.innerHTML = "";
+
+    if (posts.length === 0) {
+        container.innerHTML = `
+            <p class="empty-label">You have not posted yet.</p>
+        `;
+        return;
+    }
+
+    const currentUser = getCurrentUser();
+
+    posts.forEach((post, postIndex) => {
+        const card = document.createElement("article");
+        card.className = "feed-post-card";
+
+        const hasImages = post.images && post.images.length > 0;
+        const multipleImages = hasImages && post.images.length > 1;
+        const isLiked = post.liked_by && currentUser && post.liked_by.includes(currentUser.id);
+        const isOwner = currentUser && post.user_id === currentUser.id;
+
+        const imagesHtml = hasImages
+            ? `
+                <div class="feed-carousel" id="feed-carousel-profile-${postIndex}" data-index="0" data-total="${post.images.length}">
+                    ${multipleImages ? `<button type="button" class="carousel-btn prev-btn" onclick="changeProfileSlide(${postIndex}, -1, event)">‹</button>` : ""}
+                    
+                    <div class="feed-carousel-track" id="carousel-track-profile-${postIndex}">
+                        ${post.images.map(image => `
+                            <img src="${image}" class="feed-post-image" alt="Post image" draggable="false">
+                        `).join("")}
+                    </div>
+
+                    ${multipleImages ? `<button type="button" class="carousel-btn next-btn" onclick="changeProfileSlide(${postIndex}, 1, event)">›</button>` : ""}
+                </div>
+
+                ${multipleImages ? `
+                    <div class="carousel-dots">
+                        ${post.images.map((_, imageIndex) => `
+                            <button
+                                type="button"
+                                class="carousel-dot ${imageIndex === 0 ? "active-dot" : ""}"
+                                id="dot-profile-${postIndex}-${imageIndex}"
+                                onclick="goToProfileSlide(${postIndex}, ${imageIndex}, event)">
+                            </button>
+                        `).join("")}
+                    </div>
+                ` : ""}
+            `
+            : `<div class="feed-post-image-placeholder">No Image</div>`;
+
+        card.innerHTML = `
+            <div class="feed-post-header">
+                <div class="feed-user-avatar">
+                    ${post.username.charAt(0).toUpperCase()}
+                </div>
+                <div>
+                    <div class="feed-username">${escapeHtml(post.username)}</div>
+                    <div class="feed-post-date">${formatPostDate(post.created_at)}</div>
+                </div>
+            </div>
+
+            ${imagesHtml}
+
+            <div class="feed-post-body">
+                <p class="feed-post-caption" id="caption-${post.id}">${escapeHtml(post.caption)}</p>
+
+                <div class="feed-post-actions">
+                    <button 
+                        type="button"
+                        class="like-btn ${isLiked ? "liked" : ""}" 
+                        onclick="toggleLike('${post.id}', this)">
+                        ${isLiked ? "❤️" : "🤍"}
+                    </button>
+                    <span class="like-count">${post.likes || 0}</span>
+
+                    ${isOwner ? `
+                        <button type="button" class="edit-btn" onclick="editPost('${post.id}')">Edit</button>
+                        <button type="button" class="delete-btn" onclick="deletePost('${post.id}')">Delete</button>
+                    ` : ""}
+                </div>
+            </div>
+        `;
+
+        container.appendChild(card);
+    });
+}
+
+function changeProfileSlide(postIndex, direction, event) {
+    if (event) {
+        event.preventDefault();
+        event.stopPropagation();
+    }
+
+    const carousel = document.getElementById(`feed-carousel-profile-${postIndex}`);
+    const track = document.getElementById(`carousel-track-profile-${postIndex}`);
+    if (!carousel || !track) return;
+
+    const total = parseInt(carousel.dataset.total || "0", 10);
+    if (total <= 1) return;
+
+    let currentIndex = parseInt(carousel.dataset.index || "0", 10);
+    currentIndex = (currentIndex + direction + total) % total;
+
+    carousel.dataset.index = String(currentIndex);
+    updateProfileCarousel(postIndex, currentIndex);
+}
+
+function goToProfileSlide(postIndex, slideIndex, event) {
+    if (event) {
+        event.preventDefault();
+        event.stopPropagation();
+    }
+
+    const carousel = document.getElementById(`feed-carousel-profile-${postIndex}`);
+    if (!carousel) return;
+
+    carousel.dataset.index = String(slideIndex);
+    updateProfileCarousel(postIndex, slideIndex);
+}
+
+function updateProfileCarousel(postIndex, currentIndex) {
+    const track = document.getElementById(`carousel-track-profile-${postIndex}`);
+    if (!track) return;
+
+    const slides = track.querySelectorAll(".feed-post-image");
+    if (!slides.length) return;
+
+    track.style.transform = `translateX(-${currentIndex * 100}%)`;
+
+    slides.forEach((_, index) => {
+        const dot = document.getElementById(`dot-profile-${postIndex}-${index}`);
+        if (dot) {
+            dot.classList.toggle("active-dot", index === currentIndex);
+        }
+    });
+}
 
 // ---------- Small helper ----------
 function escapeHtml(value) {
@@ -779,4 +1370,21 @@ function escapeHtml(value) {
         .replaceAll(">", "&gt;")
         .replaceAll('"', "&quot;")
         .replaceAll("'", "&#39;");
+}
+function formatPostDate(dateString) {
+    if (!dateString) return "";
+
+    const date = new Date(dateString);
+    const now = new Date();
+
+    const diffMs = now - date;
+    const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+
+    if (diffHours < 1) return "Just now";
+    if (diffHours < 24) return `${diffHours}h ago`;
+
+    const diffDays = Math.floor(diffHours / 24);
+    if (diffDays === 1) return "Yesterday";
+
+    return date.toLocaleDateString();
 }

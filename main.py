@@ -1,7 +1,7 @@
 # ---------- Imports ----------
 from datetime import datetime, timedelta, timezone
 from typing import List, Optional
-from fastapi import FastAPI, HTTPException, status, Depends
+from fastapi import FastAPI, HTTPException, status, UploadFile, File, Form, Depends
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, RedirectResponse
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
@@ -11,8 +11,16 @@ from pydantic import BaseModel
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from pymongo import MongoClient
 from bson import ObjectId
+import os
+import shutil
+from uuid import uuid4
 
+# Initiates app
 app = FastAPI()
+
+# Creates an uploads folder
+UPLOAD_DIR = "static/uploads/posts"
+os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 # ---------- Settings ----------
 class AppSettings(BaseSettings):
@@ -35,6 +43,7 @@ foods_collection = database["Foods"]
 food_logs_collection = database["Food_logs"]
 exercises_collection = database["Exercises"]
 exercise_logs_collection = database["Exercise_logs"]
+posts_collection = database["Posts"]
 
 # ---------- Security ----------
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -152,6 +161,22 @@ class UserSummary(BaseModel):
     email: str
     role: str
 
+class PostOut(BaseModel):
+    id: str
+    user_id: str
+    username: str
+    caption: str
+    images: List[str]
+    likes: int
+    liked_by: List[str]
+    created_at: Optional[str] = None
+
+class PostUpdate(BaseModel):
+    caption: str
+
+class ProfileStats(BaseModel):
+    post_count: int
+    total_likes: int
 
 # ---------- Helper functions ----------
 def serialize_user(user) -> dict:
@@ -182,6 +207,17 @@ def serialize_exercise_log(log) -> dict:
         "created_at": log["created_at"].isoformat() if "created_at" in log and log["created_at"] else None
     }
 
+def serialize_post(post) -> dict:
+    return {
+        "id": str(post["_id"]),
+        "user_id": post["user_id"],
+        "username": post["username"],
+        "caption": post["caption"],
+        "images": post["images"],
+        "likes": post.get("likes", 0),
+        "liked_by": post.get("liked_by", []),
+        "created_at": post["created_at"].isoformat() if "created_at" in post and post["created_at"] else None
+    }
 
 # ---------- Auth routes ----------
 @app.post("/register", response_model=UserOut, status_code=status.HTTP_201_CREATED)
@@ -308,6 +344,183 @@ def add_exercise_log(log: ExerciseLogCreate, current_user=Depends(get_current_us
 
     return serialize_exercise_log(new_log)
 
+# ---------- Social Feed routes ----------
+@app.get("/feed")
+def feed_page():
+    return FileResponse("static/feed.html")
+
+
+@app.get("/feed/create")
+def create_post_page():
+    return FileResponse("static/create_post.html")
+
+
+@app.get("/feed/profile")
+def profile_page():
+    return FileResponse("static/profile.html")
+
+@app.get("/posts", response_model=List[PostOut])
+def get_recent_posts(current_user=Depends(get_current_user)):
+    posts = posts_collection.find().sort("created_at", -1).limit(10)
+    return [serialize_post(post) for post in posts]
+
+# ---------- Social Feed/Create Post routes ----------
+@app.post("/posts", response_model=PostOut, status_code=status.HTTP_201_CREATED)
+def create_post(
+    caption: str = Form(...),
+    images: List[UploadFile] = File(...),
+    current_user=Depends(get_current_user)
+):
+    if len(images) < 1 or len(images) > 5:
+        raise HTTPException(status_code=400, detail="A post must have between 1 and 5 images.")
+
+    allowed_types = {"image/jpeg", "image/png", "image/webp"}
+    saved_paths = []
+
+    for image in images:
+        if image.content_type not in allowed_types:
+            raise HTTPException(status_code=400, detail="Only JPG, PNG, and WEBP images are allowed.")
+
+        ext = os.path.splitext(image.filename)[1].lower()
+        unique_name = f"{uuid4().hex}{ext}"
+        file_path = os.path.join(UPLOAD_DIR, unique_name)
+
+        with open(file_path, "wb") as buffer:
+            shutil.copyfileobj(image.file, buffer)
+
+        saved_paths.append(f"/static/uploads/posts/{unique_name}")
+
+    post_dict = {
+        "user_id": str(current_user["_id"]),
+        "username": current_user["username"],
+        "caption": caption,
+        "images": saved_paths,
+        "created_at": datetime.now(timezone.utc),
+        "likes": 0,
+        "liked_by": []
+    }
+
+    result = posts_collection.insert_one(post_dict)
+    new_post = posts_collection.find_one({"_id": result.inserted_id})
+
+    if not new_post:
+        raise HTTPException(status_code=500, detail="Post creation failed")
+
+    return serialize_post(new_post)
+
+@app.put("/posts/{post_id}", response_model=PostOut)
+def update_post(
+    post_id: str,
+    post_update: PostUpdate,
+    current_user=Depends(get_current_user)
+):
+    if not ObjectId.is_valid(post_id):
+        raise HTTPException(status_code=400, detail="Invalid post ID")
+
+    post = posts_collection.find_one({"_id": ObjectId(post_id)})
+    if not post:
+        raise HTTPException(status_code=404, detail="Post not found")
+
+    if post["user_id"] != str(current_user["_id"]):
+        raise HTTPException(status_code=403, detail="You can only edit your own posts")
+
+    result = posts_collection.update_one(
+        {"_id": ObjectId(post_id)},
+        {"$set": {"caption": post_update.caption}}
+    )
+
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Post not found")
+
+    updated_post = posts_collection.find_one({"_id": ObjectId(post_id)})
+    return serialize_post(updated_post)
+
+@app.delete("/posts/{post_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_post(
+    post_id: str,
+    current_user=Depends(get_current_user)
+):
+    if not ObjectId.is_valid(post_id):
+        raise HTTPException(status_code=400, detail="Invalid post ID")
+
+    post = posts_collection.find_one({"_id": ObjectId(post_id)})
+    if not post:
+        raise HTTPException(status_code=404, detail="Post not found")
+
+    if post["user_id"] != str(current_user["_id"]):
+        raise HTTPException(status_code=403, detail="You can only delete your own posts")
+
+    # Delete image files from disk
+    for image_path in post.get("images", []):
+        local_path = image_path.lstrip("/")
+        if os.path.exists(local_path):
+            try:
+                os.remove(local_path)
+            except OSError:
+                pass
+
+    result = posts_collection.delete_one({"_id": ObjectId(post_id)})
+
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Post not found")
+
+    return
+
+# Like system for feed posts
+@app.post("/posts/{post_id}/like")
+def toggle_like(post_id: str, current_user=Depends(get_current_user)):
+    if not ObjectId.is_valid(post_id):
+        raise HTTPException(status_code=400, detail="Invalid post ID")
+
+    post = posts_collection.find_one({"_id": ObjectId(post_id)})
+    if not post:
+        raise HTTPException(status_code=404, detail="Post not found")
+
+    user_id = str(current_user["_id"])
+
+    if user_id in post.get("liked_by", []):
+        posts_collection.update_one(
+            {"_id": ObjectId(post_id)},
+            {
+                "$pull": {"liked_by": user_id},
+                "$inc": {"likes": -1}
+            }
+        )
+        liked = False
+    else:
+        posts_collection.update_one(
+            {"_id": ObjectId(post_id)},
+            {
+                "$addToSet": {"liked_by": user_id},
+                "$inc": {"likes": 1}
+            }
+        )
+        liked = True
+
+    updated_post = posts_collection.find_one({"_id": ObjectId(post_id)})
+
+    return {
+        "liked": liked,
+        "likes": updated_post.get("likes", 0)
+    }
+
+# ---------- Profile page routes ----------
+@app.get("/my-posts", response_model=List[PostOut])
+def get_my_posts(current_user=Depends(get_current_user)):
+    user_id = str(current_user["_id"])
+    posts = posts_collection.find({"user_id": user_id}).sort("created_at", -1)
+    return [serialize_post(post) for post in posts]
+
+@app.get("/my-profile-stats")
+def get_my_profile_stats(current_user=Depends(get_current_user)):
+    user_id = str(current_user["_id"])
+    posts = list(posts_collection.find({"user_id": user_id}))
+    total_likes = sum(post.get("likes", 0) for post in posts)
+
+    return {
+        "post_count": len(posts),
+        "total_likes": total_likes
+    }
 
 # ---------- Admin routes ----------
 @app.get("/admin/users", response_model=List[UserSummary])
