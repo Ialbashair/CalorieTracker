@@ -1,64 +1,179 @@
-# CalorieTracker 
-## HTML
-- A simple single-page application (SPA)model
-- Designed for basic CRUD functionality
-- Using an HTML Form
-```
-<body>
-    <div class="container">
-        <header>
-            <h1>Calorie Tracker</h1>            
-        </header>
-        <div class="summery-card">
-            <h2>Total Calories: <span id="total-calories">0</span> kcal</h2>            
-        </div>
-        <section class="form-section">
-            <form id="calorie-form">
-                <input type="text" id="food-name" placeholder="Food Name" required>
-                <input type="number" id="calories" placeholder="Calories" required>
-                <button type="submit" id="add-button">Add</button>
-            </form>
-        </section>
+# 🍏 Nutri – Full Stack Calorie Tracker & Social App
 
-        <section class="list-section">
-            <ul id="calorie-list"></ul>    
-        </section>        
-    </div>
-</body>
+Nutri is a full-stack web application that combines **calorie tracking**, **fitness logging**, and a **social feed** into one seamless platform. Users can track their nutrition, monitor daily stats, and share their progress with others — all in one place.
+
+---
+
+## 🚀 Features
+
+### 🔐 Authentication & User System
+
+* User registration & login (JWT-based authentication)
+* Role-based access (Admin vs Regular User)
+* Secure password hashing
+* Persistent login with token storage
+
+### 🏠 Home Dashboard
+
+* Personalized landing page after login
+* Displays:
+
+  * Calories Consumed Today
+  * Calories Burned Today
+  * Net Calories
+* Profile preview and quick navigation
+
+### 🍽️ Calorie & Exercise Tracker
+
+* Log food entries with calorie values
+* Log exercise entries with calories burned
+* Edit and delete entries
+* Daily tracking tied to user account
+
+### 📊 Stats Framework (In Progress)
+
+* Placeholder for future data visualizations
+* Designed for chart export + sharing to feed
+
+### 📸 Social Feed
+
+* Instagram-style vertical feed
+* Create posts with:
+
+  * 1–5 images
+  * Custom captions
+* Features:
+
+  * Image carousel per post
+  * Like system (1 like per user per post)
+  * Infinite scrolling
+* Profile page shows only your posts + stats
+
+### 👤 Profile System
+
+* View personal posts
+* Track total likes
+* Manage posts (edit/delete)
+
+### 🛠️ Admin Panel
+
+* View all users
+* Search users
+* Edit user roles (admin/user)
+* Delete users
+
+### ⚙️ Settings Page
+
+* Update username
+* Change password
+* Upload profile picture
+* Toggle dark mode
+
+### 🌙 Dark Mode
+
+* Full app-wide theme toggle
+* Styled across all pages
+
+---
+
+## 🧱 Tech Stack
+
+**Frontend**
+
+* HTML, CSS, JavaScript (Vanilla)
+* Responsive UI with custom styling
+
+**Backend**
+
+* FastAPI (Python)
+* MongoDB (via PyMongo)
+
+**Other**
+
+* JWT Authentication
+* File uploads (images for posts & profile pictures)
+* Uvicorn server
+
+---
+
+## 📁 Project Structure (Simplified)
+
+```
+/static
+  ├── index.html (tracker)
+  ├── home.html
+  ├── feed.html
+  ├── profile.html
+  ├── admin.html
+  ├── settings.html
+  ├── style.css
+  ├── script.js
+  └── uploads/
+
+/main.py
+/requirements.txt
 ```
 
-## CSS
-- Simple and clean
-- Functional and resizable
+---
 
-## JavaScript
-- Using FastAPI
-- Using Fetch
+## 🧪 How to Run Locally
 
-# Technical Details
-## Installation (Windows)
-First, navigate to the desired folder in File Explorer, right click and select "open in terminal".
-Then, use the command:
+1. Clone the repo:
+
 ```
-git clone https://github.com/Ialbashair/CalorieTracker.git
+git clone https://github.com/your-username/nutri.git
+cd nutri
 ```
-Then open the newly created CalorieTracker folder in vscode and enter the following in the terminal:
+
+2. Create a virtual environment:
+
 ```
-py -m venv venv
-.\venv\Scripts\activate
+python -m venv venv
+source venv/bin/activate   # or venv\Scripts\activate on Windows
+```
+
+3. Install dependencies:
+
+```
 pip install -r requirements.txt
 ```
-## Running from Terminal
-While venv is active:
+
+4. Run the server:
+
 ```
-uvicorn main:app
+uvicorn main:app --reload
 ```
-## Merging Branches
-This contains any weird errors to the sub branch rather than pushing it to main.
+
+5. Open in browser:
+
 ```
-git checkout <my-branch>
-git pull
-git merge main
-git checkout main
-git merge <my-branch>
+http://127.0.0.1:8000
 ```
+
+---
+
+## 📌 Future Improvements
+
+* Data visualizations (charts + export)
+* Post comments system
+* Profile pictures in feed for all users (fully synced)
+* Notifications / activity system
+* Mobile responsiveness improvements
+
+---
+
+## 👨‍💻 Authors
+
+Built as a team project for coursework in Business Analytics & Information Systems.
+
+---
+
+## ⭐ Summary
+
+Nutri is more than a tracker — it’s a **fitness + social platform** that lets users:
+
+* Track their habits
+* Visualize their progress
+* Share their journey
+
+---
