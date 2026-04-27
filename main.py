@@ -137,12 +137,20 @@ class FoodLog(BaseModel):
     user_id: str
     food_name: str
     calories: int
+    grams: Optional[float] = None
     created_at: Optional[str] = None
 
 
 class FoodLogCreate(BaseModel):
     food_name: str
     calories: int
+    grams: Optional[float] = None
+
+
+class FoodLogUpdate(BaseModel):
+    food_name: str
+    calories: int
+    grams: Optional[float] = None
 
 
 class ExerciseLog(BaseModel):
@@ -150,12 +158,20 @@ class ExerciseLog(BaseModel):
     user_id: str
     exercise_name: str
     calories_burned: int
+    hours: Optional[float] = None
     created_at: Optional[str] = None
 
 
 class ExerciseLogCreate(BaseModel):
     exercise_name: str
     calories_burned: int
+    hours: Optional[float] = None
+
+
+class ExerciseLogUpdate(BaseModel):
+    exercise_name: str
+    calories_burned: int
+    hours: Optional[float] = None
 
 
 class UserSummary(BaseModel):
@@ -204,12 +220,22 @@ def serialize_user(user) -> dict:
     }
 
 
+def day_range_utc(date_str: str) -> tuple[datetime, datetime]:
+    try:
+        d = datetime.strptime(date_str, "%Y-%m-%d")
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid date format. Use YYYY-MM-DD.")
+    start = datetime(d.year, d.month, d.day, tzinfo=timezone.utc)
+    return start, start + timedelta(days=1)
+
+
 def serialize_food_log(log) -> dict:
     return {
         "id": str(log["_id"]),
         "user_id": log["user_id"],
         "food_name": log["food_name"],
         "calories": log["calories"],
+        "grams": log.get("grams"),
         "created_at": log["created_at"].isoformat() if "created_at" in log and log["created_at"] else None
     }
 
@@ -220,6 +246,7 @@ def serialize_exercise_log(log) -> dict:
         "user_id": log["user_id"],
         "exercise_name": log["exercise_name"],
         "calories_burned": log["calories_burned"],
+        "hours": log.get("hours"),
         "created_at": log["created_at"].isoformat() if "created_at" in log and log["created_at"] else None
     }
 
@@ -302,9 +329,15 @@ def get_foods(current_user=Depends(get_current_user)):
 
 
 @app.get("/food-logs", response_model=List[FoodLog])
-def get_food_logs(current_user=Depends(get_current_user)):
+def get_food_logs(date: Optional[str] = None, current_user=Depends(get_current_user)):
     user_id = str(current_user["_id"])
-    logs = food_logs_collection.find({"user_id": user_id})
+    query = {"user_id": user_id}
+
+    if date:
+        start, end = day_range_utc(date)
+        query["created_at"] = {"$gte": start, "$lt": end}
+
+    logs = food_logs_collection.find(query)
     return [serialize_food_log(log) for log in logs]
 
 
@@ -316,6 +349,7 @@ def add_food_log(log: FoodLogCreate, current_user=Depends(get_current_user)):
         "user_id": user_id,
         "food_name": log.food_name,
         "calories": log.calories,
+        "grams": log.grams,
         "created_at": datetime.now(timezone.utc)
     }
 
@@ -326,6 +360,30 @@ def add_food_log(log: FoodLogCreate, current_user=Depends(get_current_user)):
         raise HTTPException(status_code=500, detail="Food log creation failed")
 
     return serialize_food_log(new_log)
+
+
+@app.put("/food-logs/{log_id}", response_model=FoodLog)
+def update_food_log(log_id: str, log: FoodLogUpdate, current_user=Depends(get_current_user)):
+    if not ObjectId.is_valid(log_id):
+        raise HTTPException(status_code=400, detail="Invalid food log ID")
+
+    user_id = str(current_user["_id"])
+    existing = food_logs_collection.find_one({"_id": ObjectId(log_id), "user_id": user_id})
+
+    if not existing:
+        raise HTTPException(status_code=404, detail="Food log not found")
+
+    food_logs_collection.update_one(
+        {"_id": ObjectId(log_id)},
+        {"$set": {
+            "food_name": log.food_name,
+            "calories": log.calories,
+            "grams": log.grams
+        }}
+    )
+
+    updated = food_logs_collection.find_one({"_id": ObjectId(log_id)})
+    return serialize_food_log(updated)
 
 
 @app.delete("/food-logs/{log_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -353,9 +411,15 @@ def get_exercises(current_user=Depends(get_current_user)):
 
 
 @app.get("/exercise-logs", response_model=List[ExerciseLog])
-def get_exercise_logs(current_user=Depends(get_current_user)):
+def get_exercise_logs(date: Optional[str] = None, current_user=Depends(get_current_user)):
     user_id = str(current_user["_id"])
-    logs = exercise_logs_collection.find({"user_id": user_id})
+    query = {"user_id": user_id}
+
+    if date:
+        start, end = day_range_utc(date)
+        query["created_at"] = {"$gte": start, "$lt": end}
+
+    logs = exercise_logs_collection.find(query)
     return [serialize_exercise_log(log) for log in logs]
 
 
@@ -367,6 +431,7 @@ def add_exercise_log(log: ExerciseLogCreate, current_user=Depends(get_current_us
         "user_id": user_id,
         "exercise_name": log.exercise_name,
         "calories_burned": log.calories_burned,
+        "hours": log.hours,
         "created_at": datetime.now(timezone.utc)
     }
 
@@ -377,6 +442,31 @@ def add_exercise_log(log: ExerciseLogCreate, current_user=Depends(get_current_us
         raise HTTPException(status_code=500, detail="Exercise log creation failed")
 
     return serialize_exercise_log(new_log)
+
+
+@app.put("/exercise-logs/{log_id}", response_model=ExerciseLog)
+def update_exercise_log(log_id: str, log: ExerciseLogUpdate, current_user=Depends(get_current_user)):
+    if not ObjectId.is_valid(log_id):
+        raise HTTPException(status_code=400, detail="Invalid exercise log ID")
+
+    user_id = str(current_user["_id"])
+    existing = exercise_logs_collection.find_one({"_id": ObjectId(log_id), "user_id": user_id})
+
+    if not existing:
+        raise HTTPException(status_code=404, detail="Exercise log not found")
+
+    exercise_logs_collection.update_one(
+        {"_id": ObjectId(log_id)},
+        {"$set": {
+            "exercise_name": log.exercise_name,
+            "calories_burned": log.calories_burned,
+            "hours": log.hours
+        }}
+    )
+
+    updated = exercise_logs_collection.find_one({"_id": ObjectId(log_id)})
+    return serialize_exercise_log(updated)
+
 
 # ---------- Social Feed routes ----------
 @app.get("/feed")

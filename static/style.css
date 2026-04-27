@@ -46,6 +46,35 @@ header h1 {
     letter-spacing: -1px;
 }
 
+.date-nav {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 18px;
+    margin-bottom: 18px;
+}
+
+.date-nav .date-arrow {
+    background-color: var(--primary);
+    color: white;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    font-size: 1.3rem;
+    line-height: 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+#tracker-date-display {
+    font-size: 1.05rem;
+    font-weight: 600;
+    color: var(--text);
+    min-width: 160px;
+    text-align: center;
+}
+
 .summary-card {
     background: var(--primary);
     color: white;
@@ -196,6 +225,21 @@ button:active {
 .actions {
     display: flex;
     gap: 8px;
+}
+
+.food-item .actions,
+.exercise-item .actions {
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.15s ease;
+}
+
+.food-item:hover .actions,
+.exercise-item:hover .actions,
+.food-item:focus-within .actions,
+.exercise-item:focus-within .actions {
+    opacity: 1;
+    pointer-events: auto;
 }
 
 .actions select {

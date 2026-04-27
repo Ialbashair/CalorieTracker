@@ -28,8 +28,14 @@
             <div id="user-bar" class="user-bar"></div>
         </header>
 
+        <div class="date-nav">
+            <button type="button" class="date-arrow" onclick="changeTrackerDate(-1)" aria-label="Previous day">‹</button>
+            <span id="tracker-date-display">Today</span>
+            <button type="button" class="date-arrow" onclick="changeTrackerDate(1)" aria-label="Next day">›</button>
+        </div>
+
         <div class="summary-card">
-            <h2>Total: <span id="total-calories">0</span> kcal</h2>
+            <h2><span id="calories-in">0</span> in &minus; <span id="calories-out">0</span> out = <span id="total-calories">0</span> total</h2>
         </div>
 
         <section class="section">
@@ -68,6 +74,23 @@
         </div>
     </div>
 
+    <!-- Edit Food Modal -->
+    <div id="edit-food-modal" class="modal">
+        <div class="modal-content">
+            <h3>Edit Food</h3>
+            <p id="edit-food-error" style="color: #ef4444; display: none; font-size: 0.8rem; margin-bottom: 10px;"></p>
+            <div class="search-wrapper">
+                <input type="text" id="edit-food-search" placeholder="Search foods..." autocomplete="off">
+                <ul id="edit-food-results" class="search-dropdown"></ul>
+            </div>
+            <input type="text" inputmode="decimal" id="edit-food-grams" placeholder="Grams" oninput="limitDecimals(this, 2)">
+            <div class="modal-actions">
+                <button onclick="saveFoodEdit()" class="save-btn">Save</button>
+                <button onclick="closeEditFoodModal()" class="cancel-btn">Cancel</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Delete Food Modal -->
     <div id="delete-food-modal" class="modal">
         <div class="modal-content">
@@ -93,6 +116,23 @@
             <div class="modal-actions">
                 <button onclick="addExerciseEntry()" class="save-btn">Add</button>
                 <button onclick="closeAddExerciseModal()" class="cancel-btn">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Edit Exercise Modal -->
+    <div id="edit-exercise-modal" class="modal">
+        <div class="modal-content">
+            <h3>Edit Exercise</h3>
+            <p id="edit-exercise-error" style="color: #ef4444; display: none; font-size: 0.8rem; margin-bottom: 10px;"></p>
+            <div class="search-wrapper">
+                <input type="text" id="edit-exercise-search" placeholder="Search exercises..." autocomplete="off">
+                <ul id="edit-exercise-results" class="search-dropdown"></ul>
+            </div>
+            <input type="text" inputmode="decimal" id="edit-exercise-hours" placeholder="Hours" oninput="limitDecimals(this, 2)">
+            <div class="modal-actions">
+                <button onclick="saveExerciseEdit()" class="save-btn">Save</button>
+                <button onclick="closeEditExerciseModal()" class="cancel-btn">Cancel</button>
             </div>
         </div>
     </div>

@@ -277,6 +277,53 @@ async function loadHomeTodayStats() {
 }
 
 // ---------- Tracker page ----------
+let trackerSelectedDate = startOfLocalDay(new Date());
+
+function startOfLocalDay(date) {
+    const d = new Date(date);
+    d.setHours(0, 0, 0, 0);
+    return d;
+}
+
+function formatTrackerDateForApi(date) {
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, "0");
+    const d = String(date.getDate()).padStart(2, "0");
+    return `${y}-${m}-${d}`;
+}
+
+function renderTrackerDateLabel() {
+    const labelEl = document.getElementById("tracker-date-display");
+    if (!labelEl) return;
+
+    const today = startOfLocalDay(new Date());
+    const diffDays = Math.round((trackerSelectedDate - today) / (1000 * 60 * 60 * 24));
+
+    if (diffDays === 0) {
+        labelEl.textContent = "Today";
+    } else if (diffDays === -1) {
+        labelEl.textContent = "Yesterday";
+    } else if (diffDays === 1) {
+        labelEl.textContent = "Tomorrow";
+    } else {
+        labelEl.textContent = trackerSelectedDate.toLocaleDateString(undefined, {
+            weekday: "short",
+            month: "short",
+            day: "numeric",
+            year: "numeric"
+        });
+    }
+}
+
+function changeTrackerDate(deltaDays) {
+    const next = new Date(trackerSelectedDate);
+    next.setDate(next.getDate() + deltaDays);
+    trackerSelectedDate = next;
+    renderTrackerDateLabel();
+    loadFoodLogs();
+    loadExerciseLogs();
+}
+
 async function setupCaloriePage() {
     const calorieList = document.getElementById("calorie-list");
     const totalDisplay = document.getElementById("total-calories");
@@ -296,6 +343,8 @@ async function setupCaloriePage() {
     }
 
     renderUserHeader(currentUser);
+    trackerSelectedDate = startOfLocalDay(new Date());
+    renderTrackerDateLabel();
     loadFoodLogs();
     loadExerciseLogs();
 }
@@ -303,10 +352,23 @@ async function setupCaloriePage() {
 // ---------- Food section ----------
 let foodList = [];
 let selectedFood = null;
+let foodCaloriesTotal = 0;
+let exerciseCaloriesTotal = 0;
+
+function updateCalorieTotals() {
+    const inEl = document.getElementById("calories-in");
+    const outEl = document.getElementById("calories-out");
+    const totalEl = document.getElementById("total-calories");
+
+    if (inEl) inEl.textContent = foodCaloriesTotal;
+    if (outEl) outEl.textContent = exerciseCaloriesTotal;
+    if (totalEl) totalEl.textContent = foodCaloriesTotal - exerciseCaloriesTotal;
+}
 
 async function loadFoodLogs() {
     try {
-        const response = await fetch("/food-logs", {
+        const dateParam = formatTrackerDateForApi(trackerSelectedDate);
+        const response = await fetch(`/food-logs?date=${dateParam}`, {
             headers: getAuthHeaders(false)
         });
 
@@ -324,10 +386,9 @@ async function loadFoodLogs() {
 
 function renderFoodList(logs) {
     const listElement = document.getElementById("calorie-list");
-    const totalDisplay = document.getElementById("total-calories");
     const emptyLabel = document.getElementById("food-empty");
 
-    if (!listElement || !totalDisplay || !emptyLabel) return;
+    if (!listElement || !emptyLabel) return;
 
     listElement.innerHTML = "";
     let total = 0;
@@ -354,16 +415,28 @@ function renderFoodList(logs) {
 
         li.appendChild(itemInfo);
 
+        const actions = document.createElement("div");
+        actions.className = "actions";
+
         const deleteBtn = document.createElement("button");
         deleteBtn.className = "delete-btn food-delete-btn";
         deleteBtn.textContent = "Delete";
         deleteBtn.onclick = () => openDeleteFoodModal(log.id);
-        li.appendChild(deleteBtn);
+        actions.appendChild(deleteBtn);
+
+        const editBtn = document.createElement("button");
+        editBtn.className = "edit-btn";
+        editBtn.textContent = "Edit";
+        editBtn.onclick = () => openEditFoodModal(log);
+        actions.appendChild(editBtn);
+
+        li.appendChild(actions);
 
         listElement.appendChild(li);
     });
 
-    totalDisplay.innerText = total;
+    foodCaloriesTotal = total;
+    updateCalorieTotals();
 }
 
 async function openAddFoodModal() {
@@ -499,7 +572,8 @@ async function addFoodEntry() {
             headers: getAuthHeaders(),
             body: JSON.stringify({
                 food_name: selectedFood.name,
-                calories: calories
+                calories: calories,
+                grams: grams
             })
         });
 
@@ -567,13 +641,182 @@ async function confirmDeleteFood() {
     }
 }
 
+// ---------- Edit Food ----------
+let foodLogToEdit = null;
+let selectedEditFood = null;
+let editFoodList = [];
+
+async function openEditFoodModal(log) {
+    foodLogToEdit = log;
+
+    const modal = document.getElementById("edit-food-modal");
+    const searchInput = document.getElementById("edit-food-search");
+    const gramsInput = document.getElementById("edit-food-grams");
+    const errorEl = document.getElementById("edit-food-error");
+    const resultsEl = document.getElementById("edit-food-results");
+
+    if (!modal || !searchInput || !gramsInput) return;
+
+    if (errorEl) errorEl.style.display = "none";
+    if (resultsEl) {
+        resultsEl.innerHTML = "";
+        resultsEl.style.display = "none";
+    }
+
+    modal.style.display = "block";
+
+    try {
+        const response = await fetch("/foods", { headers: getAuthHeaders(false) });
+        if (response.status === 401) { logoutUser(); return; }
+        if (response.ok) editFoodList = await response.json();
+    } catch (error) {
+        console.error("Error fetching foods:", error);
+    }
+
+    selectedEditFood = editFoodList.find(f => f.name === log.food_name) || null;
+    searchInput.value = log.food_name;
+    searchInput.oninput = () => filterEditFoodSearch(searchInput.value);
+
+    if (log.grams != null) {
+        gramsInput.value = log.grams;
+    } else if (selectedEditFood) {
+        const derived = (log.calories * selectedEditFood.serving_size_g) / selectedEditFood.calories;
+        gramsInput.value = derived.toFixed(2);
+    } else {
+        gramsInput.value = "";
+    }
+}
+
+function filterEditFoodSearch(query) {
+    const resultsEl = document.getElementById("edit-food-results");
+    if (!resultsEl) return;
+
+    resultsEl.innerHTML = "";
+    selectedEditFood = null;
+
+    if (!query.trim()) {
+        resultsEl.style.display = "none";
+        return;
+    }
+
+    const lower = query.toLowerCase();
+    const matches = editFoodList.filter(f => f.name.toLowerCase().includes(lower));
+
+    if (matches.length === 0) {
+        resultsEl.style.display = "none";
+        return;
+    }
+
+    matches.forEach(f => {
+        const li = document.createElement("li");
+        li.textContent = f.name;
+        li.onclick = () => {
+            const searchInput = document.getElementById("edit-food-search");
+            if (searchInput) searchInput.value = f.name;
+            selectedEditFood = f;
+            resultsEl.innerHTML = "";
+            resultsEl.style.display = "none";
+        };
+        resultsEl.appendChild(li);
+    });
+
+    resultsEl.style.display = "block";
+}
+
+function closeEditFoodModal() {
+    const modal = document.getElementById("edit-food-modal");
+    if (modal) modal.style.display = "none";
+
+    const searchInput = document.getElementById("edit-food-search");
+    const gramsInput = document.getElementById("edit-food-grams");
+    const errorEl = document.getElementById("edit-food-error");
+    const resultsEl = document.getElementById("edit-food-results");
+
+    if (searchInput) searchInput.value = "";
+    if (gramsInput) gramsInput.value = "";
+    if (errorEl) errorEl.style.display = "none";
+    if (resultsEl) {
+        resultsEl.innerHTML = "";
+        resultsEl.style.display = "none";
+    }
+
+    foodLogToEdit = null;
+    selectedEditFood = null;
+    editFoodList = [];
+}
+
+async function saveFoodEdit() {
+    const errorEl = document.getElementById("edit-food-error");
+    const gramsInput = document.getElementById("edit-food-grams");
+
+    if (!errorEl || !gramsInput || !foodLogToEdit) return;
+    errorEl.style.display = "none";
+
+    if (!selectedEditFood) {
+        errorEl.textContent = "Please select a food from the list.";
+        errorEl.style.display = "block";
+        return;
+    }
+
+    const gramsRaw = gramsInput.value.trim();
+    if (!gramsRaw) {
+        errorEl.textContent = "Please enter the amount in grams.";
+        errorEl.style.display = "block";
+        return;
+    }
+
+    const grams = parseFloat(gramsRaw);
+    if (isNaN(grams) || grams <= 0) {
+        errorEl.textContent = "Grams must be a positive number.";
+        errorEl.style.display = "block";
+        return;
+    }
+
+    const decimalParts = gramsRaw.split(".");
+    if (decimalParts.length === 2 && decimalParts[1].length > 2) {
+        errorEl.textContent = "Grams can have at most 2 decimal places (e.g. 0.25).";
+        errorEl.style.display = "block";
+        return;
+    }
+
+    const calories = Math.round((selectedEditFood.calories / selectedEditFood.serving_size_g) * grams);
+
+    try {
+        const response = await fetch(`/food-logs/${foodLogToEdit.id}`, {
+            method: "PUT",
+            headers: getAuthHeaders(),
+            body: JSON.stringify({
+                food_name: selectedEditFood.name,
+                calories: calories,
+                grams: grams
+            })
+        });
+
+        if (response.status === 401) { logoutUser(); return; }
+
+        if (response.ok) {
+            closeEditFoodModal();
+            loadFoodLogs();
+        } else {
+            const data = await response.json().catch(() => ({}));
+            errorEl.textContent = data.detail || "Failed to update food log.";
+            errorEl.style.display = "block";
+        }
+    } catch (error) {
+        console.error("Error updating food log:", error);
+        errorEl.textContent = "Something went wrong.";
+        errorEl.style.display = "block";
+    }
+}
+
 // ---------- Exercise section ----------
 let exerciseList = [];
 let selectedExercise = null;
 
 async function loadExerciseLogs() {
     try {
-        const response = await fetch("/exercise-logs", {
+        const dateParam = formatTrackerDateForApi(trackerSelectedDate);
+        const response = await fetch(`/exercise-logs?date=${dateParam}`, {
             headers: getAuthHeaders(false)
         });
 
@@ -595,6 +838,7 @@ function renderExerciseList(logs) {
     if (!listElement || !emptyLabel) return;
 
     listElement.innerHTML = "";
+    let total = 0;
 
     if (logs.length === 0) {
         emptyLabel.style.display = "block";
@@ -603,6 +847,8 @@ function renderExerciseList(logs) {
     }
 
     logs.forEach(log => {
+        total += log.calories_burned;
+
         const li = document.createElement("li");
         li.className = "item exercise-item";
 
@@ -615,14 +861,28 @@ function renderExerciseList(logs) {
 
         li.appendChild(itemInfo);
 
+        const actions = document.createElement("div");
+        actions.className = "actions";
+
         const deleteBtn = document.createElement("button");
         deleteBtn.className = "delete-btn exercise-delete-btn";
         deleteBtn.textContent = "Delete";
         deleteBtn.onclick = () => openDeleteExerciseModal(log.id);
-        li.appendChild(deleteBtn);
+        actions.appendChild(deleteBtn);
+
+        const editBtn = document.createElement("button");
+        editBtn.className = "edit-btn";
+        editBtn.textContent = "Edit";
+        editBtn.onclick = () => openEditExerciseModal(log);
+        actions.appendChild(editBtn);
+
+        li.appendChild(actions);
 
         listElement.appendChild(li);
     });
+
+    exerciseCaloriesTotal = total;
+    updateCalorieTotals();
 }
 
 let exerciseLogToDelete = null;
@@ -814,7 +1074,8 @@ async function addExerciseEntry() {
             headers: getAuthHeaders(),
             body: JSON.stringify({
                 exercise_name: selectedExercise.name,
-                calories_burned: caloriesBurned
+                calories_burned: caloriesBurned,
+                hours: hours
             })
         });
 
@@ -833,6 +1094,174 @@ async function addExerciseEntry() {
         }
     } catch (error) {
         console.error("Error logging exercise:", error);
+        errorEl.textContent = "Something went wrong.";
+        errorEl.style.display = "block";
+    }
+}
+
+// ---------- Edit Exercise ----------
+let exerciseLogToEdit = null;
+let selectedEditExercise = null;
+let editExerciseList = [];
+
+async function openEditExerciseModal(log) {
+    exerciseLogToEdit = log;
+
+    const modal = document.getElementById("edit-exercise-modal");
+    const searchInput = document.getElementById("edit-exercise-search");
+    const hoursInput = document.getElementById("edit-exercise-hours");
+    const errorEl = document.getElementById("edit-exercise-error");
+    const resultsEl = document.getElementById("edit-exercise-results");
+
+    if (!modal || !searchInput || !hoursInput) return;
+
+    if (errorEl) errorEl.style.display = "none";
+    if (resultsEl) {
+        resultsEl.innerHTML = "";
+        resultsEl.style.display = "none";
+    }
+
+    modal.style.display = "block";
+
+    try {
+        const response = await fetch("/exercises", { headers: getAuthHeaders(false) });
+        if (response.status === 401) { logoutUser(); return; }
+        if (response.ok) editExerciseList = await response.json();
+    } catch (error) {
+        console.error("Error fetching exercises:", error);
+    }
+
+    selectedEditExercise = editExerciseList.find(ex => ex.name === log.exercise_name) || null;
+    searchInput.value = log.exercise_name;
+    searchInput.oninput = () => filterEditExerciseSearch(searchInput.value);
+
+    if (log.hours != null) {
+        hoursInput.value = log.hours;
+    } else if (selectedEditExercise && selectedEditExercise.calories_per_hour) {
+        const derived = log.calories_burned / selectedEditExercise.calories_per_hour;
+        hoursInput.value = derived.toFixed(2);
+    } else {
+        hoursInput.value = "";
+    }
+}
+
+function filterEditExerciseSearch(query) {
+    const resultsEl = document.getElementById("edit-exercise-results");
+    if (!resultsEl) return;
+
+    resultsEl.innerHTML = "";
+    selectedEditExercise = null;
+
+    if (!query.trim()) {
+        resultsEl.style.display = "none";
+        return;
+    }
+
+    const lower = query.toLowerCase();
+    const matches = editExerciseList.filter(ex => ex.name.toLowerCase().includes(lower));
+
+    if (matches.length === 0) {
+        resultsEl.style.display = "none";
+        return;
+    }
+
+    matches.forEach(ex => {
+        const li = document.createElement("li");
+        li.textContent = ex.name;
+        li.onclick = () => {
+            const searchInput = document.getElementById("edit-exercise-search");
+            if (searchInput) searchInput.value = ex.name;
+            selectedEditExercise = ex;
+            resultsEl.innerHTML = "";
+            resultsEl.style.display = "none";
+        };
+        resultsEl.appendChild(li);
+    });
+
+    resultsEl.style.display = "block";
+}
+
+function closeEditExerciseModal() {
+    const modal = document.getElementById("edit-exercise-modal");
+    if (modal) modal.style.display = "none";
+
+    const searchInput = document.getElementById("edit-exercise-search");
+    const hoursInput = document.getElementById("edit-exercise-hours");
+    const errorEl = document.getElementById("edit-exercise-error");
+    const resultsEl = document.getElementById("edit-exercise-results");
+
+    if (searchInput) searchInput.value = "";
+    if (hoursInput) hoursInput.value = "";
+    if (errorEl) errorEl.style.display = "none";
+    if (resultsEl) {
+        resultsEl.innerHTML = "";
+        resultsEl.style.display = "none";
+    }
+
+    exerciseLogToEdit = null;
+    selectedEditExercise = null;
+    editExerciseList = [];
+}
+
+async function saveExerciseEdit() {
+    const errorEl = document.getElementById("edit-exercise-error");
+    const hoursInput = document.getElementById("edit-exercise-hours");
+
+    if (!errorEl || !hoursInput || !exerciseLogToEdit) return;
+    errorEl.style.display = "none";
+
+    if (!selectedEditExercise) {
+        errorEl.textContent = "Please select an exercise from the list.";
+        errorEl.style.display = "block";
+        return;
+    }
+
+    const hoursRaw = hoursInput.value.trim();
+    if (!hoursRaw) {
+        errorEl.textContent = "Please enter the number of hours.";
+        errorEl.style.display = "block";
+        return;
+    }
+
+    const hours = parseFloat(hoursRaw);
+    if (isNaN(hours) || hours <= 0) {
+        errorEl.textContent = "Hours must be a positive number.";
+        errorEl.style.display = "block";
+        return;
+    }
+
+    const decimalParts = hoursRaw.split(".");
+    if (decimalParts.length === 2 && decimalParts[1].length > 2) {
+        errorEl.textContent = "Hours can have at most 2 decimal places (e.g. 0.25).";
+        errorEl.style.display = "block";
+        return;
+    }
+
+    const caloriesBurned = Math.round(selectedEditExercise.calories_per_hour * hours);
+
+    try {
+        const response = await fetch(`/exercise-logs/${exerciseLogToEdit.id}`, {
+            method: "PUT",
+            headers: getAuthHeaders(),
+            body: JSON.stringify({
+                exercise_name: selectedEditExercise.name,
+                calories_burned: caloriesBurned,
+                hours: hours
+            })
+        });
+
+        if (response.status === 401) { logoutUser(); return; }
+
+        if (response.ok) {
+            closeEditExerciseModal();
+            loadExerciseLogs();
+        } else {
+            const data = await response.json().catch(() => ({}));
+            errorEl.textContent = data.detail || "Failed to update exercise log.";
+            errorEl.style.display = "block";
+        }
+    } catch (error) {
+        console.error("Error updating exercise log:", error);
         errorEl.textContent = "Something went wrong.";
         errorEl.style.display = "block";
     }
