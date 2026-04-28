@@ -50,17 +50,18 @@ header h1 {
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 18px;
-    margin-bottom: 18px;
+    gap: 14px;
+    margin: 18px 0;
 }
 
-.date-nav .date-arrow {
-    background-color: var(--primary);
+.date-arrow {
+    background: var(--primary);
     color: white;
-    width: 36px;
-    height: 36px;
-    border-radius: 50%;
-    font-size: 1.3rem;
+    width: 34px;
+    height: 34px;
+    border-radius: 999px;
+    font-size: 1.4rem;
+    font-weight: 800;
     line-height: 1;
     display: inline-flex;
     align-items: center;
@@ -68,11 +69,10 @@ header h1 {
 }
 
 #tracker-date-display {
-    font-size: 1.05rem;
-    font-weight: 600;
-    color: var(--text);
-    min-width: 160px;
+    min-width: 140px;
     text-align: center;
+    font-weight: 700;
+    color: var(--text);
 }
 
 .summary-card {

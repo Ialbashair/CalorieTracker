@@ -322,12 +322,16 @@ function renderTrackerDateLabel() {
 function changeTrackerDate(deltaDays) {
     const next = new Date(trackerSelectedDate);
     next.setDate(next.getDate() + deltaDays);
-    trackerSelectedDate = next;
+    trackerSelectedDate = startOfLocalDay(next);
+
+    foodCaloriesTotal = 0;
+    exerciseCaloriesTotal = 0;
+    updateCalorieTotals();
+
     renderTrackerDateLabel();
     loadFoodLogs();
     loadExerciseLogs();
 }
-
 async function setupCaloriePage() {
     const calorieList = document.getElementById("calorie-list");
     const totalDisplay = document.getElementById("total-calories");
@@ -364,9 +368,13 @@ function updateCalorieTotals() {
     const outEl = document.getElementById("calories-out");
     const totalEl = document.getElementById("total-calories");
 
-    if (inEl) inEl.textContent = foodCaloriesTotal;
-    if (outEl) outEl.textContent = exerciseCaloriesTotal;
-    if (totalEl) totalEl.textContent = foodCaloriesTotal - exerciseCaloriesTotal;
+    const caloriesIn = Number(foodCaloriesTotal) || 0;
+    const caloriesOut = Number(exerciseCaloriesTotal) || 0;
+    const netCalories = caloriesIn - caloriesOut;
+
+    if (inEl) inEl.textContent = caloriesIn;
+    if (outEl) outEl.textContent = caloriesOut;
+    if (totalEl) totalEl.textContent = netCalories;
 }
 
 async function loadFoodLogs() {
