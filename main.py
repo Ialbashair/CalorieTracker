@@ -148,6 +148,7 @@ class FoodLogCreate(BaseModel):
     food_name: str
     calories: int
     grams: Optional[float] = None
+    date: Optional[str] = None
 
 
 class FoodLogUpdate(BaseModel):
@@ -169,6 +170,7 @@ class ExerciseLogCreate(BaseModel):
     exercise_name: str
     calories_burned: int
     hours: Optional[float] = None
+    date: Optional[str] = None
 
 
 class ExerciseLogUpdate(BaseModel):
@@ -232,6 +234,21 @@ def day_range_utc(date_str: str) -> tuple[datetime, datetime]:
         raise HTTPException(status_code=400, detail="Invalid date format. Use YYYY-MM-DD.")
     start = datetime(d.year, d.month, d.day, tzinfo=timezone.utc)
     return start, start + timedelta(days=1)
+
+
+def log_timestamp_for(date_str: Optional[str]) -> datetime:
+    now_utc = datetime.now(timezone.utc)
+    if not date_str:
+        return now_utc
+    try:
+        d = datetime.strptime(date_str, "%Y-%m-%d")
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid date format. Use YYYY-MM-DD.")
+    selected = datetime(d.year, d.month, d.day, tzinfo=timezone.utc)
+    today = datetime(now_utc.year, now_utc.month, now_utc.day, tzinfo=timezone.utc)
+    if selected == today:
+        return now_utc
+    return selected + timedelta(hours=12)
 
 
 def serialize_food_log(log) -> dict:
@@ -356,7 +373,7 @@ def add_food_log(log: FoodLogCreate, current_user=Depends(get_current_user)):
         "food_name": log.food_name,
         "calories": log.calories,
         "grams": log.grams,
-        "created_at": datetime.now(timezone.utc)
+        "created_at": log_timestamp_for(log.date)
     }
 
     result = food_logs_collection.insert_one(log_dict)
@@ -438,7 +455,7 @@ def add_exercise_log(log: ExerciseLogCreate, current_user=Depends(get_current_us
         "exercise_name": log.exercise_name,
         "calories_burned": log.calories_burned,
         "hours": log.hours,
-        "created_at": datetime.now(timezone.utc)
+        "created_at": log_timestamp_for(log.date)
     }
 
     result = exercise_logs_collection.insert_one(log_dict)

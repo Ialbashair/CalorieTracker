@@ -73,6 +73,28 @@ header h1 {
     text-align: center;
     font-weight: 700;
     color: var(--text);
+    background: transparent;
+    border: none;
+    padding: 6px 10px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: inherit;
+    font-family: inherit;
+}
+
+#tracker-date-display:hover {
+    background: rgba(0, 0, 0, 0.05);
+}
+
+.tracker-date-input-hidden {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    opacity: 0;
+    pointer-events: none;
+    border: 0;
+    padding: 0;
+    margin: 0;
 }
 
 .summary-card {
