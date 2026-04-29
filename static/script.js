@@ -23,6 +23,7 @@ window.onload = async () => {
     await setupFeedPage();
     await setupProfilePage();
     await setupSettingsPage();
+    await setupWeeklyRecapPage();
 };
 
 // ---------- Auth helpers ----------
@@ -91,6 +92,10 @@ function setTheme(theme) {
     const finalTheme = theme === "dark" ? "dark" : "light";
     localStorage.setItem("nutriTheme", finalTheme);
     document.body.classList.toggle("dark-mode", finalTheme === "dark");
+
+    if (latestWeeklyRecap) {
+        drawWeeklyRecapCard(latestWeeklyRecap);
+    }
 }
 
 // ---------- Register ----------
@@ -1744,6 +1749,7 @@ async function setupCreatePostPage() {
     usernameEl.textContent = currentUser.username;
 
     imageInput.addEventListener("change", previewPostImages);
+    loadPendingRecapIntoCreatePost();
 }
 
 function previewPostImages() {
@@ -2103,6 +2109,290 @@ async function deletePost(postId) {
     } catch (error) {
         console.error("Error deleting post:", error);
         alert("Something went wrong.");
+    }
+}
+// ---------- Stats page ----------
+let latestWeeklyRecap = null;
+
+async function setupWeeklyRecapPage() {
+    const canvas = document.getElementById("weekly-recap-canvas");
+    if (!canvas) return;
+
+    const token = getToken();
+    if (!token) {
+        window.location.href = "/login";
+        return;
+    }
+
+    const currentUser = await fetchCurrentUserFromToken();
+    if (!currentUser) {
+        logoutUser();
+        return;
+    }
+
+    renderUserHeader(currentUser);
+    await loadWeeklyRecap();
+}
+
+async function loadWeeklyRecap() {
+    const messageEl = document.getElementById("weekly-recap-message");
+
+    try {
+        const response = await fetch("/weekly-recap", {
+            headers: getAuthHeaders(false)
+        });
+
+        if (response.status === 401) {
+            logoutUser();
+            return;
+        }
+
+        const data = await response.json();
+
+        if (response.ok) {
+            latestWeeklyRecap = data;
+            drawWeeklyRecapCard(data);
+
+            if (messageEl) {
+                messageEl.textContent = "Weekly recap updated.";
+                messageEl.style.color = "green";
+            }
+        } else if (messageEl) {
+            messageEl.textContent = data.detail || "Failed to load weekly recap.";
+            messageEl.style.color = "red";
+        }
+    } catch (error) {
+        console.error("Error loading weekly recap:", error);
+        if (messageEl) {
+            messageEl.textContent = "Something went wrong.";
+            messageEl.style.color = "red";
+        }
+    }
+}
+
+function drawWeeklyRecapCard(data) {
+    const canvas = document.getElementById("weekly-recap-canvas");
+    if (!canvas || !data) return;
+
+    const ctx = canvas.getContext("2d");
+    const isDarkMode = document.body.classList.contains("dark-mode");
+
+    const colors = isDarkMode
+        ? {
+            background: "#111827",
+            card: "#1f2937",
+            statBox: "#111827",
+            primary: "#22c55e",
+            text: "#f9fafb",
+            muted: "#d1d5db",
+            footer: "#9ca3af",
+            positiveBar: "#22c55e",
+            negativeBar: "#38bdf8"
+        }
+        : {
+            background: "#f3f4f6",
+            card: "#ffffff",
+            statBox: "#f9fafb",
+            primary: "#06c206",
+            text: "#1f2937",
+            muted: "#6b7280",
+            footer: "#6b7280",
+            positiveBar: "#06c206",
+            negativeBar: "#3b82f6"
+        };
+
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    ctx.fillStyle = colors.background;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    ctx.fillStyle = colors.card;
+    roundRect(ctx, 80, 80, 920, 920, 40);
+    ctx.fill();
+
+    ctx.fillStyle = colors.primary;
+    ctx.font = "bold 70px Segoe UI, Arial";
+    ctx.textAlign = "center";
+    ctx.fillText("Nutri Weekly Recap", 540, 170);
+
+    ctx.fillStyle = colors.muted;
+    ctx.font = "34px Segoe UI, Arial";
+    ctx.fillText(`${data.week_start} to ${data.week_end}`, 540, 225);
+
+    drawRecapStat(ctx, "Calories Consumed", data.total_consumed, 210, 310, colors);
+    drawRecapStat(ctx, "Calories Burned", data.total_burned, 560, 310, colors);
+    drawRecapStat(ctx, "Net Calories", data.net_calories, 210, 520, colors);
+    drawRecapStat(ctx, "Days Logged", `${data.days_logged}/7`, 560, 520, colors);
+
+    const maxNet = Math.max(...data.daily.map(day => Math.abs(day.net_calories)), 1);
+    const startX = 170;
+    const baseY = 820;
+    const barWidth = 70;
+    const gap = 35;
+
+    ctx.font = "22px Segoe UI, Arial";
+    ctx.textAlign = "center";
+
+    data.daily.forEach((day, index) => {
+        const x = startX + index * (barWidth + gap);
+        const barHeight = Math.max(8, Math.abs(day.net_calories) / maxNet * 150);
+
+        ctx.fillStyle = day.net_calories >= 0 ? colors.positiveBar : colors.negativeBar;
+        ctx.fillRect(x, baseY - barHeight, barWidth, barHeight);
+
+        ctx.fillStyle = colors.muted;
+        const date = new Date(day.date);
+        const label = date.toLocaleDateString(undefined, { weekday: "short" });
+        ctx.fillText(label, x + barWidth / 2, baseY + 40);
+    });
+
+    ctx.fillStyle = colors.footer;
+    ctx.font = "28px Segoe UI, Arial";
+    ctx.fillText("Shared from Nutri", 540, 960);
+}
+
+function drawRecapStat(ctx, label, value, x, y, colors) {
+    ctx.fillStyle = colors.statBox;
+    roundRect(ctx, x, y, 310, 150, 24);
+    ctx.fill();
+
+    ctx.fillStyle = colors.muted;
+    ctx.font = "26px Segoe UI, Arial";
+    ctx.textAlign = "center";
+    ctx.fillText(label, x + 155, y + 48);
+
+    ctx.fillStyle = colors.primary;
+    ctx.font = "bold 46px Segoe UI, Arial";
+    ctx.fillText(String(value), x + 155, y + 105);
+}
+
+function roundRect(ctx, x, y, width, height, radius) {
+    ctx.beginPath();
+    ctx.moveTo(x + radius, y);
+    ctx.lineTo(x + width - radius, y);
+    ctx.quadraticCurveTo(x + width, y, x + width, y + radius);
+    ctx.lineTo(x + width, y + height - radius);
+    ctx.quadraticCurveTo(x + width, y + height, x + width - radius, y + height);
+    ctx.lineTo(x + radius, y + height);
+    ctx.quadraticCurveTo(x, y + height, x, y + height - radius);
+    ctx.lineTo(x, y + radius);
+    ctx.quadraticCurveTo(x, y, x + radius, y);
+    ctx.closePath();
+}
+
+async function shareWeeklyRecap() {
+    const canvas = document.getElementById("weekly-recap-canvas");
+    const messageEl = document.getElementById("weekly-recap-message");
+
+    if (!canvas || !latestWeeklyRecap) {
+        if (messageEl) {
+            messageEl.textContent = "Generate a recap first.";
+            messageEl.style.color = "red";
+        }
+        return;
+    }
+
+    const recapImageDataUrl = canvas.toDataURL("image/png");
+
+    const recapCaption = `My Nutri weekly recap: ${latestWeeklyRecap.total_consumed} calories consumed, ${latestWeeklyRecap.total_burned} burned, ${latestWeeklyRecap.days_logged}/7 days logged.`;
+
+    sessionStorage.setItem("pendingRecapImage", recapImageDataUrl);
+    sessionStorage.setItem("pendingRecapCaption", recapCaption);
+
+    window.location.href = "/feed/create";
+}
+
+function dataUrlToFile(dataUrl, filename) {
+    const arr = dataUrl.split(",");
+    const mimeMatch = arr[0].match(/:(.*?);/);
+    const mime = mimeMatch ? mimeMatch[1] : "image/png";
+    const bstr = atob(arr[1]);
+
+    let n = bstr.length;
+    const u8arr = new Uint8Array(n);
+
+    while (n--) {
+        u8arr[n] = bstr.charCodeAt(n);
+    }
+
+    return new File([u8arr], filename, { type: mime });
+}
+
+function loadPendingRecapIntoCreatePost() {
+    const imageInput = document.getElementById("post-images");
+    const captionInput = document.getElementById("post-caption");
+    const preview = document.getElementById("post-image-preview");
+
+    if (!imageInput || !captionInput || !preview) return;
+
+    const pendingImage = sessionStorage.getItem("pendingRecapImage");
+    const pendingCaption = sessionStorage.getItem("pendingRecapCaption");
+
+    if (!pendingImage) return;
+
+    const recapFile = dataUrlToFile(pendingImage, "weekly-recap.png");
+
+    const dataTransfer = new DataTransfer();
+    dataTransfer.items.add(recapFile);
+    imageInput.files = dataTransfer.files;
+
+    if (pendingCaption) {
+        captionInput.value = pendingCaption;
+    }
+
+    preview.innerHTML = "";
+
+    const img = document.createElement("img");
+    img.src = pendingImage;
+    preview.appendChild(img);
+
+    sessionStorage.removeItem("pendingRecapImage");
+    sessionStorage.removeItem("pendingRecapCaption");
+}
+
+function downloadWeeklyRecap() {
+    const canvas = document.getElementById("weekly-recap-canvas");
+    const messageEl = document.getElementById("weekly-recap-message");
+
+    if (!canvas || !latestWeeklyRecap) {
+        if (messageEl) {
+            messageEl.textContent = "Generate a recap first.";
+            messageEl.style.color = "red";
+        }
+        return;
+    }
+
+    const link = document.createElement("a");
+    link.download = `nutri-weekly-recap-${latestWeeklyRecap.week_end || "latest"}.png`;
+    link.href = canvas.toDataURL("image/png");
+    link.click();
+
+    if (messageEl) {
+        messageEl.textContent = "Recap downloaded.";
+        messageEl.style.color = "green";
+    }
+}
+
+function showStatsTab(tabName) {
+    const statisticsTab = document.getElementById("statistics-tab");
+    const visualizationsTab = document.getElementById("visualizations-tab");
+    const tabButtons = document.querySelectorAll(".stats-tab");
+
+    if (!statisticsTab || !visualizationsTab) return;
+
+    statisticsTab.style.display = tabName === "statistics" ? "block" : "none";
+    visualizationsTab.style.display = tabName === "visualizations" ? "block" : "none";
+
+    tabButtons.forEach(button => {
+        button.classList.remove("active-stats-tab");
+    });
+
+    const activeButton = Array.from(tabButtons).find(button =>
+        button.textContent.toLowerCase().includes(tabName)
+    );
+
+    if (activeButton) {
+        activeButton.classList.add("active-stats-tab");
     }
 }
 

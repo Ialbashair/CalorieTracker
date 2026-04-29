@@ -213,6 +213,24 @@ class HomeTodayStats(BaseModel):
     calories_burned_today: int
     net_calories_today: int
 
+class WeeklyRecapDay(BaseModel):
+    date: str
+    calories_consumed: int
+    calories_burned: int
+    net_calories: int
+    food_logs: int
+    exercise_logs: int
+
+
+class WeeklyRecapOut(BaseModel):
+    week_start: str
+    week_end: str
+    total_consumed: int
+    total_burned: int
+    net_calories: int
+    days_logged: int
+    daily: List[WeeklyRecapDay]
+
 # ---------- Helper functions ----------
 def serialize_user(user) -> dict:
     return {
@@ -472,6 +490,69 @@ def update_exercise_log(log_id: str, log: ExerciseLogUpdate, current_user=Depend
 
     updated = exercise_logs_collection.find_one({"_id": ObjectId(log_id)})
     return serialize_exercise_log(updated)
+
+# ---------- Stats Page routes ----------
+@app.get("/weekly-recap", response_model=WeeklyRecapOut)
+def get_weekly_recap(current_user=Depends(get_current_user)):
+    user_id = str(current_user["_id"])
+
+    today = datetime.now(timezone.utc).date()
+    start_date = today - timedelta(days=6)
+
+    daily = []
+    total_consumed = 0
+    total_burned = 0
+    days_logged = 0
+
+    for i in range(7):
+        current_date = start_date + timedelta(days=i)
+
+        start = datetime(
+            current_date.year,
+            current_date.month,
+            current_date.day,
+            tzinfo=timezone.utc
+        )
+        end = start + timedelta(days=1)
+
+        food_logs = list(food_logs_collection.find({
+            "user_id": user_id,
+            "created_at": {"$gte": start, "$lt": end}
+        }))
+
+        exercise_logs = list(exercise_logs_collection.find({
+            "user_id": user_id,
+            "created_at": {"$gte": start, "$lt": end}
+        }))
+
+        consumed = sum(log.get("calories", 0) for log in food_logs)
+        burned = sum(log.get("calories_burned", 0) for log in exercise_logs)
+        net = consumed - burned
+
+        if food_logs or exercise_logs:
+            days_logged += 1
+
+        total_consumed += consumed
+        total_burned += burned
+
+        daily.append({
+            "date": current_date.isoformat(),
+            "calories_consumed": consumed,
+            "calories_burned": burned,
+            "net_calories": net,
+            "food_logs": len(food_logs),
+            "exercise_logs": len(exercise_logs)
+        })
+
+    return {
+        "week_start": start_date.isoformat(),
+        "week_end": today.isoformat(),
+        "total_consumed": total_consumed,
+        "total_burned": total_burned,
+        "net_calories": total_consumed - total_burned,
+        "days_logged": days_logged,
+        "daily": daily
+    }
 
 
 # ---------- Social Feed routes ----------
