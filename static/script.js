@@ -2273,7 +2273,7 @@ function drawWeeklyRecapCard(data) {
         ctx.fillRect(x, baseY - barHeight, barWidth, barHeight);
 
         ctx.fillStyle = colors.muted;
-        const date = new Date(day.date);
+        const date = parseLocalDate(day.date);
         const label = date.toLocaleDateString(undefined, { weekday: "short" });
         ctx.fillText(label, x + barWidth / 2, baseY + 40);
     });
@@ -2647,4 +2647,9 @@ function getProfileAvatarHtml(user, sizeClass = "") {
             ${escapeHtml(firstLetter)}
         </div>
     `;
+}
+
+function parseLocalDate(dateString) {
+    const [year, month, day] = dateString.split("-").map(Number);
+    return new Date(year, month - 1, day);
 }
