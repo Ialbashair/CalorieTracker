@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nutri - Settings</title>
+    <link rel="icon" type="image/x-icon" href="/static/favicon.ico">
+    <link rel="stylesheet" href="/static/style.css">
+    <script src="/static/script.js" defer></script>
+</head>
+<body>
+    <div class="container">
+        <header class="top-header">
+            <div class="brand-row">
+                <img src="/static/favicon.ico" alt="Nutri logo" class="brand-logo">
+                <h1>Nutri</h1>
+            </div>
+
+            <nav class="page-tabs">
+                <a href="/home" class="tab-link">Home</a>
+                <a href="/tracker" class="tab-link">Tracker</a>
+                <a href="/stats" class="tab-link">Stats</a>
+                <a href="/feed" class="tab-link">Social Feed</a>
+                <a href="/admin" class="tab-link admin-tab" id="admin-tab" style="display: none;">Admin</a>
+            </nav>
+
+            <div id="user-bar" class="user-bar"></div>
+        </header>
+
+        <section class="section">
+            <div class="section-header">
+                <h2>Profile Picture</h2>
+            </div>
+
+            <div class="settings-card">
+                <div id="settings-profile-preview" class="settings-profile-preview"></div>
+
+                <input type="file" id="settings-profile-picture-input" accept="image/*">
+                <button class="save-btn" onclick="submitProfilePicture()">Upload Profile Picture</button>
+                <p id="settings-profile-picture-message" class="auth-message"></p>
+            </div>
+        </section>
+
+        <section class="section">
+            <div class="section-header">
+                <h2>Account Settings</h2>
+            </div>
+
+            <div class="settings-card">
+                <p><strong>Current Username:</strong> <span id="settings-current-username"></span></p>
+                <p><strong>Email:</strong> <span id="settings-current-email"></span></p>
+
+                <input type="text" id="settings-new-username" placeholder="New username">
+                <button class="save-btn" onclick="submitUsernameChange()">Save Username</button>
+                <p id="settings-username-message" class="auth-message"></p>
+            </div>
+        </section>
+
+        <section class="section">
+            <div class="section-header">
+                <h2>Change Password</h2>
+            </div>
+
+            <div class="settings-card">
+                <input type="password" id="settings-current-password" placeholder="Current password">
+                <input type="password" id="settings-new-password" placeholder="New password">
+                <button class="save-btn" onclick="submitPasswordChange()">Update Password</button>
+                <p id="settings-password-message" class="auth-message"></p>
+            </div>
+        </section>
+
+        <section class="section">
+            <div class="section-header">
+                <h2>Appearance</h2>
+            </div>
+
+            <div class="settings-card">
+                <label for="theme-select">Theme</label>
+                <select id="theme-select" onchange="setTheme(this.value)">
+                    <option value="light">Light</option>
+                    <option value="dark">Dark</option>
+                </select>
+            </div>
+        </section>
+    </div>
+</body>
+</html>

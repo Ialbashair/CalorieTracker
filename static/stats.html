@@ -3,9 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nutri - Admin</title>
+    <title>Nutri - Stats</title>
     <link rel="icon" type="image/x-icon" href="/static/favicon.ico">
     <link rel="stylesheet" href="/static/style.css">
+    <script src='https://cdn.plot.ly/plotly-3.4.0.min.js'></script>
     <script src="/static/script.js" defer></script>
 </head>
 <body>
@@ -19,9 +20,9 @@
             <nav class="page-tabs">
                 <a href="/home" class="tab-link">Home</a>
                 <a href="/tracker" class="tab-link">Tracker</a>
-                <a href="/stats" class="tab-link">Stats</a>
+                <a href="/stats" class="tab-link active-tab">Stats</a>
                 <a href="/feed" class="tab-link">Social Feed</a>
-                <a href="/admin" class="tab-link active-tab admin-tab" id="admin-tab">Admin</a>
+                <a href="/admin" class="tab-link admin-tab" id="admin-tab" style="display: none;">Admin</a>
             </nav>
 
             <div id="user-bar" class="user-bar"></div>
@@ -29,18 +30,9 @@
 
         <section class="section">
             <div class="section-header">
-                <h2>User Management</h2>
+                <h2>Stats & Visualizations</h2>
             </div>
-
-            <input
-                type="text"
-                id="admin-user-search"
-                placeholder="Search by username or email"
-                oninput="filterAdminUsers()"
-            >
-
-            <p id="admin-empty" class="empty-label">No users found.</p>
-            <ul id="admin-user-list"></ul>
+            <div id="graph-container"></div>
         </section>
     </div>
 </body>

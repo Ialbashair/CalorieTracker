@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nutri - Home</title>
+    <link rel="icon" type="image/x-icon" href="/static/favicon.ico">
+    <link rel="stylesheet" href="/static/style.css">
+    <script src="/static/script.js" defer></script>
+</head>
+<body>
+    <div class="container">
+        <header class="top-header">
+            <div class="brand-row">
+                <img src="/static/favicon.ico" alt="Nutri logo" class="brand-logo">
+                <h1>Nutri</h1>
+            </div>
+
+            <nav class="page-tabs">
+                <a href="/home" class="tab-link active-tab">Home</a>
+                <a href="/tracker" class="tab-link">Tracker</a>
+                <a href="/stats" class="tab-link">Stats</a>
+                <a href="/feed" class="tab-link">Social Feed</a>
+                <a href="/admin" class="tab-link admin-tab" id="admin-tab" style="display: none;">Admin</a>
+            </nav>
+
+            <div id="user-bar" class="user-bar"></div>
+        </header>
+
+        <section class="section">
+            <div class="home-profile-card">
+                <div class="home-profile-picture" id="home-profile-picture">👤</div>
+                <h2 id="home-username">Username</h2>
+                <a href="/feed/profile" class="tab-link home-profile-link">Go to Profile</a>
+            </div>
+        </section>
+
+        <section class="section">
+            <div class="section-header">
+                <h2>Today</h2>
+            </div>
+
+            <div class="home-stats-grid">
+                <div class="home-stat-card">
+                    <div class="home-stat-label">Calories Consumed Today</div>
+                    <div class="home-stat-value" id="home-calories-consumed">0</div>
+                </div>
+
+                <div class="home-stat-card">
+                    <div class="home-stat-label">Calories Burned Today</div>
+                    <div class="home-stat-value" id="home-calories-burned">0</div>
+                </div>
+                    <div class="home-stat-card">
+                        <div class="home-stat-label">Net Calories Today</div>
+                        <div class="home-stat-value" id="home-net-calories">0</div>
+                    </div>
+            </div>
+        </section>
+
+        <section class="section">
+            <div class="home-member-since">
+                <p id="home-user-since">User Since --</p>
+            </div>
+        </section>
+    </div>
+</body>
+</html>

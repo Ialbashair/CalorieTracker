@@ -3,44 +3,46 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nutri - Admin</title>
+    <title>Nutri - Social Feed</title>
     <link rel="icon" type="image/x-icon" href="/static/favicon.ico">
     <link rel="stylesheet" href="/static/style.css">
     <script src="/static/script.js" defer></script>
 </head>
 <body>
-    <div class="container">
+    <div class="container feed-container">
         <header class="top-header">
             <div class="brand-row">
                 <img src="/static/favicon.ico" alt="Nutri logo" class="brand-logo">
                 <h1>Nutri</h1>
             </div>
 
+            <!-- Main app tabs -->
             <nav class="page-tabs">
                 <a href="/home" class="tab-link">Home</a>
                 <a href="/tracker" class="tab-link">Tracker</a>
                 <a href="/stats" class="tab-link">Stats</a>
-                <a href="/feed" class="tab-link">Social Feed</a>
-                <a href="/admin" class="tab-link active-tab admin-tab" id="admin-tab">Admin</a>
+                <a href="/feed" class="tab-link active-tab">Social Feed</a>
+                <a href="/admin" class="tab-link admin-tab" id="admin-tab" style="display: none;">Admin</a>
             </nav>
 
             <div id="user-bar" class="user-bar"></div>
+
+            <!-- Feed-specific tabs -->
+            <nav class="sub-tabs">
+                <a href="/feed" class="sub-tab-link active-sub-tab">Feed</a>
+                <a href="/feed/create" class="sub-tab-link">Create New Post +</a>
+                <a href="/feed/profile" class="sub-tab-link">Profile</a>
+            </nav>
         </header>
 
         <section class="section">
             <div class="section-header">
-                <h2>User Management</h2>
+                <h2>Recent Posts</h2>
             </div>
 
-            <input
-                type="text"
-                id="admin-user-search"
-                placeholder="Search by username or email"
-                oninput="filterAdminUsers()"
-            >
-
-            <p id="admin-empty" class="empty-label">No users found.</p>
-            <ul id="admin-user-list"></ul>
+            <div id="feed-posts" class="feed-posts"></div>
+            <div id="feed-loading" class="feed-loading" style="display: none;">Loading more posts...</div>
+            <div id="feed-end" class="feed-loading" style="display: none;">You're all caught up 🎉</div>
         </section>
     </div>
 </body>
