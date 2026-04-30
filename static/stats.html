@@ -30,10 +30,59 @@
 
         <section class="section">
             <div class="section-header">
-                <h2>Stats & Visualizations</h2>
+                <div>
+                    <h2>Stats & Visualizations</h2>
+                    <p class="section-subtext">Review your progress, generate recaps, and view charts.</p>
+                </div>
             </div>
-            <div id="graph-container"></div>
+
+            <nav class="stats-tabs">
+                <button type="button" class="stats-tab active-stats-tab" onclick="showStatsTab('statistics')">
+                    Statistics
+                </button>
+                <button type="button" class="stats-tab" onclick="showStatsTab('visualizations')">
+                    Visualizations
+                </button>
+            </nav>
         </section>
+
+        <div id="statistics-tab" class="stats-tab-content">
+            <section class="section">
+                <div class="section-header">
+                    <div>
+                        <h2>Weekly Recap</h2>
+                        <p class="section-subtext">Generate a shareable summary of your last 7 days.</p>
+                    </div>
+                </div>
+
+                <div class="weekly-recap-card">
+                    <canvas id="weekly-recap-canvas" width="1080" height="1080"></canvas>
+
+                    <div class="modal-actions">
+                        <button class="save-btn" onclick="loadWeeklyRecap()">Refresh Recap</button>
+                        <button class="add-section-btn" onclick="shareWeeklyRecap()">Share to Feed</button>
+                        <button class="save-btn" onclick="downloadWeeklyRecap()">Download Recap</button>
+                    </div>
+
+                    <p id="weekly-recap-message" class="auth-message"></p>
+                </div>
+            </section>
+        </div>
+
+        <div id="visualizations-tab" class="stats-tab-content" style="display: none;">
+            <section class="section">
+                <div class="section-header">
+                    <div>
+                        <h2>Visualizations</h2>
+                        <p class="section-subtext">Charts and deeper progress tracking can go here.</p>
+                    </div>
+                </div>
+
+                <div class="visualization-placeholder">
+                    <div id="graph-container"></div>
+                </div>
+            </section>
+        </div>
     </div>
 </body>
 </html>

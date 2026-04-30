@@ -30,7 +30,8 @@
 
         <div class="date-nav">
             <button type="button" class="date-arrow" onclick="changeTrackerDate(-1)" aria-label="Previous day">‹</button>
-            <span id="tracker-date-display">Today</span>
+            <button type="button" id="tracker-date-display" onclick="openTrackerDatePicker()" aria-label="Pick a date">Today</button>
+            <input type="date" id="tracker-date-input" class="tracker-date-input-hidden" onchange="onTrackerDatePicked(this.value)">
             <button type="button" class="date-arrow" onclick="changeTrackerDate(1)" aria-label="Next day">›</button>
         </div>
 

@@ -50,17 +50,18 @@ header h1 {
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 18px;
-    margin-bottom: 18px;
+    gap: 14px;
+    margin: 18px 0;
 }
 
-.date-nav .date-arrow {
-    background-color: var(--primary);
+.date-arrow {
+    background: var(--primary);
     color: white;
-    width: 36px;
-    height: 36px;
-    border-radius: 50%;
-    font-size: 1.3rem;
+    width: 34px;
+    height: 34px;
+    border-radius: 999px;
+    font-size: 1.4rem;
+    font-weight: 800;
     line-height: 1;
     display: inline-flex;
     align-items: center;
@@ -68,11 +69,32 @@ header h1 {
 }
 
 #tracker-date-display {
-    font-size: 1.05rem;
-    font-weight: 600;
-    color: var(--text);
-    min-width: 160px;
+    min-width: 140px;
     text-align: center;
+    font-weight: 700;
+    color: var(--text);
+    background: transparent;
+    border: none;
+    padding: 6px 10px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: inherit;
+    font-family: inherit;
+}
+
+#tracker-date-display:hover {
+    background: rgba(0, 0, 0, 0.05);
+}
+
+.tracker-date-input-hidden {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    opacity: 0;
+    pointer-events: none;
+    border: 0;
+    padding: 0;
+    margin: 0;
 }
 
 .summary-card {
@@ -549,12 +571,14 @@ button:active {
 
 .feed-post-image {
     width: 100%;
-    height: 320px;
-    object-fit: cover;
+    height: auto;
+    max-height: 750px;
+    object-fit: contain;
     flex: 0 0 100%;
     display: block;
     user-select: none;
     -webkit-user-drag: none;
+    background: #f3f4f6;
 }
 
 .feed-post-image-placeholder {
@@ -851,6 +875,26 @@ button:active {
     font-size: 1rem;
 }
 
+.weekly-recap-card {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    background: white;
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 20px;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.04);
+}
+
+#weekly-recap-canvas {
+    width: 100%;
+    max-width: 520px;
+    height: auto;
+    border-radius: 16px;
+    align-self: center;
+    border: 1px solid var(--border);
+}
+
 /* ---------- Dark mode ---------- */
 body.dark-mode {
     --bg: #111827;
@@ -942,6 +986,12 @@ body.dark-mode .active-dot {
 
 body.dark-mode .avatar-fallback {
     background: #111827;
+    border-color: var(--border);
+}
+
+body.dark-mode .weekly-recap-card {
+    background: var(--card);
+    color: var(--text);
     border-color: var(--border);
 }
 
@@ -1059,4 +1109,138 @@ body.dark-mode .home-profile-link {
 body.dark-mode .home-profile-link:hover {
     background: #1f2937;
     color: var(--primary);
+}
+
+.stats-tabs {
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+    margin: 18px 0 24px;
+    flex-wrap: wrap;
+}
+
+.stats-tab {
+    background: #f9fafb;
+    color: var(--text);
+    border: 1px solid var(--border);
+    padding: 10px 18px;
+    border-radius: 999px;
+    font-weight: 700;
+}
+
+.stats-tab:hover {
+    background: #eef2ff;
+    color: var(--primary);
+}
+
+.active-stats-tab {
+    background: var(--primary);
+    color: white;
+    border-color: var(--primary);
+}
+
+.stats-tab-content {
+    margin-top: 10px;
+}
+
+.visualization-placeholder {
+    background: white;
+    border: 2px dashed var(--border);
+    border-radius: 16px;
+    padding: 35px;
+    text-align: center;
+    color: #6b7280;
+}
+
+body.dark-mode .stats-tab {
+    background: #111827;
+    color: var(--text);
+    border-color: var(--border);
+}
+
+body.dark-mode .stats-tab:hover {
+    background: #1f2937;
+    color: var(--primary);
+}
+
+body.dark-mode .active-stats-tab {
+    background: var(--primary);
+    color: white;
+}
+
+body.dark-mode .visualization-placeholder {
+    background: var(--card);
+    color: #d1d5db;
+    border-color: var(--border);
+}
+
+body.dark-mode .feed-post-image {
+    background: #111827;
+}
+
+/* ---------- Login/Register buttons ---------- */
+#login-btn,
+#register-btn {
+    width: 100%;
+    background: var(--primary);
+    color: white;
+    padding: 12px 18px;
+    border-radius: 999px;
+    font-weight: 700;
+    font-size: 1rem;
+    border: 1px solid var(--primary);
+}
+
+#login-btn:hover,
+#register-btn:hover {
+    background: #059905;
+    border-color: #059905;
+}
+
+/* ---------- Logout button in top user bar ---------- */
+.user-bar button {
+    background: transparent;
+    color: var(--primary);
+    border: 1px solid var(--primary);
+    padding: 8px 16px;
+    border-radius: 999px;
+    font-weight: 700;
+}
+
+.user-bar button:hover {
+    background: var(--primary);
+    color: white;
+}
+
+/* ---------- Dark mode logout button ---------- */
+body.dark-mode .user-bar button {
+    color: var(--primary);
+    border-color: var(--primary);
+}
+
+body.dark-mode .user-bar button:hover {
+    background: var(--primary);
+    color: white;
+}
+
+/* ---------- Login form layout ---------- */
+.auth-form {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+}
+
+/* Inputs row (email + password) */
+.auth-input-row {
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+    width: 100%;
+}
+
+/* Individual inputs */
+.auth-input-row input {
+    flex: 1;
+    max-width: 220px;
 }

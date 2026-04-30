@@ -13,10 +13,39 @@ from pymongo import MongoClient
 from bson import ObjectId
 import os
 import shutil
+import logging
+from logging.handlers import RotatingFileHandler
 from uuid import uuid4
 
 # Initiates app
 app = FastAPI()
+
+# ---------- Logging setup ----------
+LOG_DIR = "logs"
+os.makedirs(LOG_DIR, exist_ok=True)
+
+logger = logging.getLogger("nutri")
+logger.setLevel(logging.INFO)
+
+log_formatter = logging.Formatter(
+    "%(asctime)s | %(levelname)s | %(name)s | %(message)s"
+)
+
+file_handler = RotatingFileHandler(
+    os.path.join(LOG_DIR, "nutri.log"),
+    maxBytes=1_000_000,
+    backupCount=5
+)
+file_handler.setFormatter(log_formatter)
+file_handler.setLevel(logging.INFO)
+
+console_handler = logging.StreamHandler()
+console_handler.setFormatter(log_formatter)
+console_handler.setLevel(logging.INFO)
+
+if not logger.handlers:
+    logger.addHandler(file_handler)
+    logger.addHandler(console_handler)
 
 # Creates an uploads folder
 UPLOAD_DIR = "static/uploads/posts"
@@ -148,6 +177,7 @@ class FoodLogCreate(BaseModel):
     food_name: str
     calories: int
     grams: Optional[float] = None
+    log_date: Optional[str] = None
 
 
 class FoodLogUpdate(BaseModel):
@@ -169,6 +199,7 @@ class ExerciseLogCreate(BaseModel):
     exercise_name: str
     calories_burned: int
     hours: Optional[float] = None
+    log_date: Optional[str] = None
 
 
 class ExerciseLogUpdate(BaseModel):
@@ -213,6 +244,24 @@ class HomeTodayStats(BaseModel):
     calories_burned_today: int
     net_calories_today: int
 
+class WeeklyRecapDay(BaseModel):
+    date: str
+    calories_consumed: int
+    calories_burned: int
+    net_calories: int
+    food_logs: int
+    exercise_logs: int
+
+
+class WeeklyRecapOut(BaseModel):
+    week_start: str
+    week_end: str
+    total_consumed: int
+    total_burned: int
+    net_calories: int
+    days_logged: int
+    daily: List[WeeklyRecapDay]
+
 # ---------- Helper functions ----------
 def serialize_user(user) -> dict:
     return {
@@ -232,6 +281,15 @@ def day_range_utc(date_str: str) -> tuple[datetime, datetime]:
         raise HTTPException(status_code=400, detail="Invalid date format. Use YYYY-MM-DD.")
     start = datetime(d.year, d.month, d.day, tzinfo=timezone.utc)
     return start, start + timedelta(days=1)
+
+def created_at_for_log_date(log_date: Optional[str]) -> datetime:
+    if not log_date:
+        return datetime.now(timezone.utc)
+
+    start, _ = day_range_utc(log_date)
+
+    # Store at noon UTC so it safely lands inside the selected date bucket
+    return start + timedelta(hours=12)
 
 
 def serialize_food_log(log) -> dict:
@@ -273,10 +331,12 @@ def serialize_post(post) -> dict:
 def register_user(user: UserCreate):
     existing_email = users_collection.find_one({"email": user.email})
     if existing_email:
+        logger.warning("Registration failed: email already registered email=%s", user.email)
         raise HTTPException(status_code=400, detail="Email already registered")
 
     existing_username = users_collection.find_one({"username": user.username})
     if existing_username:
+        logger.warning("Registration failed: username already taken username=%s", user.username)
         raise HTTPException(status_code=400, detail="Username already taken")
 
     user_dict = {
@@ -291,7 +351,10 @@ def register_user(user: UserCreate):
     new_user = users_collection.find_one({"_id": result.inserted_id})
 
     if not new_user:
+        logger.error("User registration failed after insert: email=%s username=%s", user.email, user.username)
         raise HTTPException(status_code=500, detail="User registration failed")
+
+    logger.info("New user registered: user_id=%s email=%s username=%s", str(new_user["_id"]), user.email, user.username)
 
     return serialize_user(new_user)
 
@@ -301,12 +364,16 @@ def login_user(user: UserLogin):
     existing_user = users_collection.find_one({"email": user.email})
 
     if not existing_user:
+        logger.warning("Login failed: user not found email=%s", user.email)
         raise HTTPException(status_code=401, detail="Invalid email or password")
 
     if not verify_password(user.password, existing_user["password"]):
+        logger.warning("Login failed: incorrect password email=%s", user.email)
         raise HTTPException(status_code=401, detail="Invalid email or password")
 
     access_token = create_access_token(str(existing_user["_id"]))
+
+    logger.info("User logged in: user_id=%s email=%s", str(existing_user["_id"]), user.email)
 
     return {
         "access_token": access_token,
@@ -356,14 +423,25 @@ def add_food_log(log: FoodLogCreate, current_user=Depends(get_current_user)):
         "food_name": log.food_name,
         "calories": log.calories,
         "grams": log.grams,
-        "created_at": datetime.now(timezone.utc)
+        "created_at": created_at_for_log_date(log.log_date)
     }
 
     result = food_logs_collection.insert_one(log_dict)
     new_log = food_logs_collection.find_one({"_id": result.inserted_id})
 
     if not new_log:
+        logger.error("Food log creation failed: user_id=%s food=%s", user_id, log.food_name)
         raise HTTPException(status_code=500, detail="Food log creation failed")
+
+    logger.info(
+        "Food log added: user_id=%s log_id=%s food=%s calories=%s grams=%s log_date=%s",
+        user_id,
+        str(new_log["_id"]),
+        log.food_name,
+        log.calories,
+        log.grams,
+        log.log_date
+    )
 
     return serialize_food_log(new_log)
 
@@ -389,6 +467,16 @@ def update_food_log(log_id: str, log: FoodLogUpdate, current_user=Depends(get_cu
     )
 
     updated = food_logs_collection.find_one({"_id": ObjectId(log_id)})
+
+    logger.info(
+        "Food log updated: user_id=%s log_id=%s food=%s calories=%s grams=%s",
+        user_id,
+        log_id,
+        log.food_name,
+        log.calories,
+        log.grams
+    )
+
     return serialize_food_log(updated)
 
 
@@ -405,6 +493,8 @@ def archive_food_log(log_id: str, current_user=Depends(get_current_user)):
 
     food_logs_archive_collection.insert_one(log)
     food_logs_collection.delete_one({"_id": ObjectId(log_id)})
+
+    logger.info("Food log archived: user_id=%s log_id=%s", user_id, log_id)
 
     return
 
@@ -438,14 +528,25 @@ def add_exercise_log(log: ExerciseLogCreate, current_user=Depends(get_current_us
         "exercise_name": log.exercise_name,
         "calories_burned": log.calories_burned,
         "hours": log.hours,
-        "created_at": datetime.now(timezone.utc)
+        "created_at": created_at_for_log_date(log.log_date)
     }
 
     result = exercise_logs_collection.insert_one(log_dict)
     new_log = exercise_logs_collection.find_one({"_id": result.inserted_id})
 
     if not new_log:
+        logger.error("Exercise log creation failed: user_id=%s exercise=%s", user_id, log.exercise_name)
         raise HTTPException(status_code=500, detail="Exercise log creation failed")
+
+    logger.info(
+        "Exercise log added: user_id=%s log_id=%s exercise=%s calories_burned=%s hours=%s log_date=%s",
+        user_id,
+        str(new_log["_id"]),
+        log.exercise_name,
+        log.calories_burned,
+        log.hours,
+        log.log_date
+    )
 
     return serialize_exercise_log(new_log)
 
@@ -471,7 +572,88 @@ def update_exercise_log(log_id: str, log: ExerciseLogUpdate, current_user=Depend
     )
 
     updated = exercise_logs_collection.find_one({"_id": ObjectId(log_id)})
+
+    logger.info(
+        "Exercise log updated: user_id=%s log_id=%s exercise=%s calories_burned=%s hours=%s",
+        user_id,
+        log_id,
+        log.exercise_name,
+        log.calories_burned,
+        log.hours
+    )
+
     return serialize_exercise_log(updated)
+
+# ---------- Stats Page routes ----------
+@app.get("/weekly-recap", response_model=WeeklyRecapOut)
+def get_weekly_recap(current_user=Depends(get_current_user)):
+    user_id = str(current_user["_id"])
+
+    today = datetime.now(timezone.utc).date()
+    start_date = today - timedelta(days=6)
+
+    daily = []
+    total_consumed = 0
+    total_burned = 0
+    days_logged = 0
+
+    for i in range(7):
+        current_date = start_date + timedelta(days=i)
+
+        start = datetime(
+            current_date.year,
+            current_date.month,
+            current_date.day,
+            tzinfo=timezone.utc
+        )
+        end = start + timedelta(days=1)
+
+        food_logs = list(food_logs_collection.find({
+            "user_id": user_id,
+            "created_at": {"$gte": start, "$lt": end}
+        }))
+
+        exercise_logs = list(exercise_logs_collection.find({
+            "user_id": user_id,
+            "created_at": {"$gte": start, "$lt": end}
+        }))
+
+        consumed = sum(log.get("calories", 0) for log in food_logs)
+        burned = sum(log.get("calories_burned", 0) for log in exercise_logs)
+        net = consumed - burned
+
+        if food_logs or exercise_logs:
+            days_logged += 1
+
+        total_consumed += consumed
+        total_burned += burned
+
+        daily.append({
+            "date": current_date.isoformat(),
+            "calories_consumed": consumed,
+            "calories_burned": burned,
+            "net_calories": net,
+            "food_logs": len(food_logs),
+            "exercise_logs": len(exercise_logs)
+        })
+
+    logger.info(
+        "Weekly recap generated: user_id=%s week_start=%s week_end=%s days_logged=%s",
+        user_id,
+        start_date.isoformat(),
+        today.isoformat(),
+        days_logged
+    )
+
+    return {
+        "week_start": start_date.isoformat(),
+        "week_end": today.isoformat(),
+        "total_consumed": total_consumed,
+        "total_burned": total_burned,
+        "net_calories": total_consumed - total_burned,
+        "days_logged": days_logged,
+        "daily": daily
+    }
 
 
 # ---------- Social Feed routes ----------
@@ -506,6 +688,7 @@ def create_post(
     current_user=Depends(get_current_user)
 ):
     if len(images) < 1 or len(images) > 5:
+        logger.warning("Post creation failed: invalid image count user_id=%s image_count=%s", str(current_user["_id"]), len(images))
         raise HTTPException(status_code=400, detail="A post must have between 1 and 5 images.")
 
     allowed_types = {"image/jpeg", "image/png", "image/webp"}
@@ -513,6 +696,7 @@ def create_post(
 
     for image in images:
         if image.content_type not in allowed_types:
+            logger.warning("Post creation failed: invalid image type user_id=%s content_type=%s", str(current_user["_id"]), image.content_type)
             raise HTTPException(status_code=400, detail="Only JPG, PNG, and WEBP images are allowed.")
 
         ext = os.path.splitext(image.filename)[1].lower()
@@ -538,7 +722,15 @@ def create_post(
     new_post = posts_collection.find_one({"_id": result.inserted_id})
 
     if not new_post:
+        logger.error("Post creation failed after insert: user_id=%s", str(current_user["_id"]))
         raise HTTPException(status_code=500, detail="Post creation failed")
+
+    logger.info(
+        "Post created: user_id=%s post_id=%s image_count=%s",
+        str(current_user["_id"]),
+        str(new_post["_id"]),
+        len(saved_paths)
+    )
 
     return serialize_post(new_post)
 
@@ -567,6 +759,9 @@ def update_post(
         raise HTTPException(status_code=404, detail="Post not found")
 
     updated_post = posts_collection.find_one({"_id": ObjectId(post_id)})
+
+    logger.info("Post updated: user_id=%s post_id=%s", str(current_user["_id"]), post_id)
+
     return serialize_post(updated_post)
 
 @app.delete("/posts/{post_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -596,7 +791,10 @@ def delete_post(
     result = posts_collection.delete_one({"_id": ObjectId(post_id)})
 
     if result.deleted_count == 0:
+        logger.warning("Post delete failed after delete attempt: post_id=%s", post_id)
         raise HTTPException(status_code=404, detail="Post not found")
+
+    logger.info("Post deleted: user_id=%s post_id=%s", str(current_user["_id"]), post_id)
 
     return
 
@@ -621,6 +819,7 @@ def toggle_like(post_id: str, current_user=Depends(get_current_user)):
             }
         )
         liked = False
+        logger.info("Post unliked: user_id=%s post_id=%s", user_id, post_id)
     else:
         posts_collection.update_one(
             {"_id": ObjectId(post_id)},
@@ -630,6 +829,7 @@ def toggle_like(post_id: str, current_user=Depends(get_current_user)):
             }
         )
         liked = True
+        logger.info("Post liked: user_id=%s post_id=%s", user_id, post_id)
 
     updated_post = posts_collection.find_one({"_id": ObjectId(post_id)})
 
@@ -668,6 +868,7 @@ def update_username(
 
     existing_user = users_collection.find_one({"username": new_username})
     if existing_user and str(existing_user["_id"]) != str(current_user["_id"]):
+        logger.warning("Username update failed: username already taken user_id=%s new_username=%s", str(current_user["_id"]), new_username)
         raise HTTPException(status_code=400, detail="Username already taken")
 
     users_collection.update_one(
@@ -681,6 +882,9 @@ def update_username(
     )
 
     updated_user = users_collection.find_one({"_id": current_user["_id"]})
+
+    logger.info("Username updated: user_id=%s new_username=%s", str(current_user["_id"]), new_username)
+
     return serialize_user(updated_user)
 
 @app.put("/settings/password")
@@ -701,6 +905,8 @@ def update_password(
         {"$set": {"password": new_hashed_password}}
     )
 
+    logger.info("Password updated: user_id=%s", str(current_user["_id"]))
+
     return {"message": "Password updated successfully"}
 
 @app.delete("/exercise-logs/{log_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -717,6 +923,8 @@ def archive_exercise_log(log_id: str, current_user=Depends(get_current_user)):
     exercise_logs_archive_collection.insert_one(log)
     exercise_logs_collection.delete_one({"_id": ObjectId(log_id)})
 
+    logger.info("Exercise log archived: user_id=%s log_id=%s", user_id, log_id)
+
     return
 
 @app.post("/settings/profile-picture", response_model=UserOut)
@@ -727,6 +935,7 @@ def upload_profile_picture(
     allowed_types = {"image/jpeg", "image/png", "image/webp"}
 
     if image.content_type not in allowed_types:
+        logger.warning("Profile picture upload failed: invalid image type user_id=%s content_type=%s", str(current_user["_id"]), image.content_type)
         raise HTTPException(status_code=400, detail="Only JPG, PNG, and WEBP images are allowed.")
 
     # delete old profile picture if one exists
@@ -753,13 +962,22 @@ def upload_profile_picture(
         {"$set": {"profile_picture": public_path}}
     )
 
+    posts_collection.update_many(
+        {"user_id": str(current_user["_id"])},
+        {"$set": {"profile_picture": public_path}}
+    )
+
     updated_user = users_collection.find_one({"_id": current_user["_id"]})
+
+    logger.info("Profile picture updated: user_id=%s path=%s", str(current_user["_id"]), public_path)
+
     return serialize_user(updated_user)
 
 
 # ---------- Admin routes ----------
 @app.get("/admin/users", response_model=List[UserSummary])
 def get_all_users(current_user=Depends(require_admin)):
+    logger.info("Admin user list viewed: admin_user_id=%s", str(current_user["_id"]))
     users = users_collection.find()
     return [serialize_user(user) for user in users]
 
@@ -770,6 +988,7 @@ def delete_user(user_id: str, current_user=Depends(require_admin)):
         raise HTTPException(status_code=400, detail="Invalid user ID")
 
     if str(current_user["_id"]) == user_id:
+        logger.warning("Admin delete user failed: admin tried to delete self admin_user_id=%s", user_id)
         raise HTTPException(status_code=400, detail="Admins cannot delete themselves")
 
     result = users_collection.delete_one({"_id": ObjectId(user_id)})
@@ -780,6 +999,8 @@ def delete_user(user_id: str, current_user=Depends(require_admin)):
     food_logs_collection.delete_many({"user_id": user_id})
     exercise_logs_collection.delete_many({"user_id": user_id})
 
+    logger.info("User deleted by admin: admin_user_id=%s deleted_user_id=%s", str(current_user["_id"]), user_id)
+
     return
 
 
@@ -789,6 +1010,7 @@ def update_user_role(user_id: str, role_update: UserRoleUpdate, current_user=Dep
         raise HTTPException(status_code=400, detail="Invalid user ID")
 
     if role_update.role not in ["user", "admin"]:
+        logger.warning("Admin role update failed: invalid role target_user_id=%s role=%s", user_id, role_update.role)
         raise HTTPException(status_code=400, detail="Role must be 'user' or 'admin'")
 
     if str(current_user["_id"]) == user_id:
@@ -803,6 +1025,14 @@ def update_user_role(user_id: str, role_update: UserRoleUpdate, current_user=Dep
         raise HTTPException(status_code=404, detail="User not found")
 
     updated_user = users_collection.find_one({"_id": ObjectId(user_id)})
+
+    logger.info(
+        "User role updated by admin: admin_user_id=%s target_user_id=%s new_role=%s",
+        str(current_user["_id"]),
+        user_id,
+        role_update.role
+    )
+
     return serialize_user(updated_user)
 
 # ---------- Home routes ----------
