@@ -152,22 +152,6 @@ http://127.0.0.1:8000
 
 ---
 
-## 📌 Future Improvements
-
-* Data visualizations (charts + export)
-* Post comments system
-* Profile pictures in feed for all users (fully synced)
-* Notifications / activity system
-* Mobile responsiveness improvements
-
----
-
-## 👨‍💻 Authors
-
-Built as a team project for coursework in Business Analytics & Information Systems.
-
----
-
 ## ⭐ Summary
 
 Nutri is more than a tracker — it’s a **fitness + social platform** that lets users:
