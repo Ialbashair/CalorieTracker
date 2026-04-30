@@ -73,6 +73,28 @@ header h1 {
     text-align: center;
     font-weight: 700;
     color: var(--text);
+    background: transparent;
+    border: none;
+    padding: 6px 10px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: inherit;
+    font-family: inherit;
+}
+
+#tracker-date-display:hover {
+    background: rgba(0, 0, 0, 0.05);
+}
+
+.tracker-date-input-hidden {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    opacity: 0;
+    pointer-events: none;
+    border: 0;
+    padding: 0;
+    margin: 0;
 }
 
 .summary-card {
@@ -1154,4 +1176,71 @@ body.dark-mode .visualization-placeholder {
 
 body.dark-mode .feed-post-image {
     background: #111827;
+}
+
+/* ---------- Login/Register buttons ---------- */
+#login-btn,
+#register-btn {
+    width: 100%;
+    background: var(--primary);
+    color: white;
+    padding: 12px 18px;
+    border-radius: 999px;
+    font-weight: 700;
+    font-size: 1rem;
+    border: 1px solid var(--primary);
+}
+
+#login-btn:hover,
+#register-btn:hover {
+    background: #059905;
+    border-color: #059905;
+}
+
+/* ---------- Logout button in top user bar ---------- */
+.user-bar button {
+    background: transparent;
+    color: var(--primary);
+    border: 1px solid var(--primary);
+    padding: 8px 16px;
+    border-radius: 999px;
+    font-weight: 700;
+}
+
+.user-bar button:hover {
+    background: var(--primary);
+    color: white;
+}
+
+/* ---------- Dark mode logout button ---------- */
+body.dark-mode .user-bar button {
+    color: var(--primary);
+    border-color: var(--primary);
+}
+
+body.dark-mode .user-bar button:hover {
+    background: var(--primary);
+    color: white;
+}
+
+/* ---------- Login form layout ---------- */
+.auth-form {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+}
+
+/* Inputs row (email + password) */
+.auth-input-row {
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+    width: 100%;
+}
+
+/* Individual inputs */
+.auth-input-row input {
+    flex: 1;
+    max-width: 220px;
 }
