@@ -1,6 +1,13 @@
+import sys
+from pathlib import Path
+
 import pytest
 import mongomock
 from fastapi.testclient import TestClient
+
+# Add the project root folder to Python's import path
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(PROJECT_ROOT))
 
 import main
 
