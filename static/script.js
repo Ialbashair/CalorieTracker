@@ -327,15 +327,44 @@ function renderTrackerDateLabel() {
 function changeTrackerDate(deltaDays) {
     const next = new Date(trackerSelectedDate);
     next.setDate(next.getDate() + deltaDays);
-    trackerSelectedDate = startOfLocalDay(next);
+    setTrackerSelectedDate(next);
+}
+
+function setTrackerSelectedDate(date) {
+    trackerSelectedDate = startOfLocalDay(date);
 
     foodCaloriesTotal = 0;
     exerciseCaloriesTotal = 0;
     updateCalorieTotals();
 
     renderTrackerDateLabel();
+    syncTrackerDateInput();
     loadFoodLogs();
     loadExerciseLogs();
+}
+
+function syncTrackerDateInput() {
+    const input = document.getElementById("tracker-date-input");
+    if (input) input.value = formatTrackerDateForApi(trackerSelectedDate);
+}
+
+function openTrackerDatePicker() {
+    const input = document.getElementById("tracker-date-input");
+    if (!input) return;
+    syncTrackerDateInput();
+    if (typeof input.showPicker === "function") {
+        input.showPicker();
+    } else {
+        input.focus();
+        input.click();
+    }
+}
+
+function onTrackerDatePicked(value) {
+    if (!value) return;
+    const [y, m, d] = value.split("-").map(Number);
+    if (!y || !m || !d) return;
+    setTrackerSelectedDate(new Date(y, m - 1, d));
 }
 async function setupCaloriePage() {
     const calorieList = document.getElementById("calorie-list");
@@ -358,6 +387,7 @@ async function setupCaloriePage() {
     renderUserHeader(currentUser);
     trackerSelectedDate = startOfLocalDay(new Date());
     renderTrackerDateLabel();
+    syncTrackerDateInput();
     loadFoodLogs();
     loadExerciseLogs();
 }
