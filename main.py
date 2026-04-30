@@ -148,6 +148,7 @@ class FoodLogCreate(BaseModel):
     food_name: str
     calories: int
     grams: Optional[float] = None
+    log_date: Optional[str] = None
 
 
 class FoodLogUpdate(BaseModel):
@@ -169,6 +170,7 @@ class ExerciseLogCreate(BaseModel):
     exercise_name: str
     calories_burned: int
     hours: Optional[float] = None
+    log_date: Optional[str] = None
 
 
 class ExerciseLogUpdate(BaseModel):
@@ -250,6 +252,15 @@ def day_range_utc(date_str: str) -> tuple[datetime, datetime]:
         raise HTTPException(status_code=400, detail="Invalid date format. Use YYYY-MM-DD.")
     start = datetime(d.year, d.month, d.day, tzinfo=timezone.utc)
     return start, start + timedelta(days=1)
+
+def created_at_for_log_date(log_date: Optional[str]) -> datetime:
+    if not log_date:
+        return datetime.now(timezone.utc)
+
+    start, _ = day_range_utc(log_date)
+
+    # Store at noon UTC so it safely lands inside the selected date bucket
+    return start + timedelta(hours=12)
 
 
 def serialize_food_log(log) -> dict:
@@ -374,7 +385,7 @@ def add_food_log(log: FoodLogCreate, current_user=Depends(get_current_user)):
         "food_name": log.food_name,
         "calories": log.calories,
         "grams": log.grams,
-        "created_at": datetime.now(timezone.utc)
+        "created_at": created_at_for_log_date(log.log_date)
     }
 
     result = food_logs_collection.insert_one(log_dict)
@@ -456,7 +467,7 @@ def add_exercise_log(log: ExerciseLogCreate, current_user=Depends(get_current_us
         "exercise_name": log.exercise_name,
         "calories_burned": log.calories_burned,
         "hours": log.hours,
-        "created_at": datetime.now(timezone.utc)
+        "created_at": created_at_for_log_date(log.log_date)
     }
 
     result = exercise_logs_collection.insert_one(log_dict)

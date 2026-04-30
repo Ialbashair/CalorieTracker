@@ -590,7 +590,8 @@ async function addFoodEntry() {
             body: JSON.stringify({
                 food_name: selectedFood.name,
                 calories: calories,
-                grams: grams
+                grams: grams,
+                log_date: formatTrackerDateForApi(trackerSelectedDate)
             })
         });
 
@@ -1092,7 +1093,8 @@ async function addExerciseEntry() {
             body: JSON.stringify({
                 exercise_name: selectedExercise.name,
                 calories_burned: caloriesBurned,
-                hours: hours
+                hours: hours,
+                log_date: formatTrackerDateForApi(trackerSelectedDate)
             })
         });
 
