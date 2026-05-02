@@ -289,7 +289,7 @@ def created_at_for_log_date(log_date: Optional[str]) -> datetime:
     start, _ = day_range_utc(log_date)
 
     # Store at noon UTC so it safely lands inside the selected date bucket
-    return start + timedelta(hours=12)
+    return datetime.now(timezone.utc)
 
 
 def serialize_food_log(log) -> dict:

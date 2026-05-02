@@ -415,7 +415,6 @@ async function setupStatsPage() {
 
     let food     = await fetchFoodLogs();
     let exercise = await fetchExerciseLogs();
-    // console.log(food, exercise);
 
     let total_timestamps = [];
     let total_calories   = [];
@@ -424,24 +423,27 @@ async function setupStatsPage() {
     let ei = 0;
     let total = 0;
     while (fi < food.length || ei < exercise.length) {
-        let ft = (fi < food.length)     ? Date.parse(food[fi].created_at)     : null;
-        let et = (ei < exercise.length) ? Date.parse(exercise[fi].created_at) : null;
+        let ft = (fi < food.length)     ? Date.parse(food[fi].created_at)     : new Date(8640000000000000).getTime();
+        let et = (ei < exercise.length) ? Date.parse(exercise[ei].created_at) : new Date(8640000000000000).getTime();
 
-        if (et === null || ft < et) {
+        if (ft < et) {
             total += food[fi].calories;
             total_timestamps.push(food[fi].created_at);
             fi += 1;
         }
-        else if (ft === null || et < ft) {
+        else if (et < ft) {
             total -= exercise[ei].calories_burned;
             total_timestamps.push(exercise[ei].created_at);
             ei += 1;
         }
-        else {
+        else if (ft === et) {
             total += food[fi].calories - exercise[ei].calories_burned;
             total_timestamps.push(food[fi].created_at);
             ft += 1;
             ei += 1;
+        }
+        else {
+            break;
         }
 
         total_calories.push(total);
@@ -481,6 +483,7 @@ async function setupStatsPage() {
     let data = [gained, burned, total_line];
 
     let layout = {
+        width: 550,
         title: {
             text: "Calories Burned/Gained",
         },
