@@ -71,6 +71,26 @@
 
         <section class="section">
             <div class="section-header">
+                <h2>Daily Goals</h2>
+            </div>
+
+            <div class="settings-card">
+                <label for="settings-calorie-goal">Daily calorie goal</label>
+                <input type="number" id="settings-calorie-goal" placeholder="Example: 2000" min="1">
+
+                <label for="settings-exercise-goal">Daily exercise calories burned goal</label>
+                <input type="number" id="settings-exercise-goal" placeholder="Example: 500" min="1">
+
+                <label for="settings-water-goal">Daily water goal (mL)</label>
+                <input type="number" id="settings-water-goal" placeholder="Example: 2000" min="1">
+
+                <button class="save-btn" onclick="submitGoalChange()">Save Goals</button>
+                <p id="settings-goals-message" class="auth-message"></p>
+            </div>
+        </section>
+
+        <section class="section">
+            <div class="section-header">
                 <h2>Appearance</h2>
             </div>
 
