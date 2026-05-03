@@ -383,8 +383,8 @@ async function setupCaloriePage() {
     trackerSelectedDate = startOfLocalDay(new Date());
     renderTrackerDateLabel();
     syncTrackerDateInput();
-    loadFoodLogs();
-    loadExerciseLogs();
+    
+    updateCaloriePage();
 }
 
 function updateCaloriePage() {
@@ -393,6 +393,7 @@ function updateCaloriePage() {
     updateCalorieTotals();
     loadFoodLogs();
     loadExerciseLogs();
+    loadWaterLogs();
 }
 
 // ---------- Stats page ----------
@@ -516,6 +517,57 @@ async function renderPlot(graphContainer=null) {
 }
 
 // ---------- Food section ----------
+const MEAL_ORDER = ["breakfast", "lunch", "dinner", "snack"];
+const MEAL_LABELS = {
+    breakfast: "Breakfast",
+    lunch: "Lunch",
+    dinner: "Dinner",
+    snack: "Snack"
+};
+
+function defaultMealForNow() {
+    const h = new Date().getHours();
+    if (h >= 5 && h <= 10) return "breakfast";
+    if (h >= 11 && h <= 15) return "lunch";
+    if (h >= 16 && h <= 21) return "dinner";
+    return "snack";
+}
+
+function inferMealFromCreatedAt(createdAt) {
+    if (!createdAt) return "snack";
+    const d = new Date(createdAt);
+    if (isNaN(d.getTime())) return "snack";
+    const h = d.getHours();
+    if (h >= 5 && h <= 10) return "breakfast";
+    if (h >= 11 && h <= 15) return "lunch";
+    if (h >= 16 && h <= 21) return "dinner";
+    return "snack";
+}
+
+function mealForLog(log) {
+    if (log.meal && MEAL_ORDER.includes(log.meal)) return log.meal;
+    return inferMealFromCreatedAt(log.created_at);
+}
+
+function unitLabelForFood(food) {
+    return food && food.serving_unit === "mL" ? "mL" : "Grams";
+}
+
+function unitCodeForFood(food) {
+    return food && food.serving_unit === "mL" ? "mL" : "g";
+}
+
+function servingSizeOf(food) {
+    if (!food) return null;
+    return food.serving_size != null ? food.serving_size : food.serving_size_g;
+}
+
+function applyFoodUnitToInput(food, inputId) {
+    const input = document.getElementById(inputId);
+    if (!input) return;
+    input.placeholder = unitLabelForFood(food);
+}
+
 let foodList = [];
 let selectedFood = null;
 let foodCaloriesTotal = 0;
@@ -563,6 +615,39 @@ async function fetchFoodLogs() {
     }
 }
 
+function buildFoodListItem(log) {
+    const li = document.createElement("li");
+    li.className = "item food-item";
+
+    const itemInfo = document.createElement("div");
+    itemInfo.className = "item-info";
+
+    const strong = document.createElement("strong");
+    strong.textContent = log.food_name;
+    itemInfo.appendChild(strong);
+    itemInfo.append(` - ${log.calories} kcal`);
+
+    li.appendChild(itemInfo);
+
+    const actions = document.createElement("div");
+    actions.className = "actions";
+
+    const deleteBtn = document.createElement("button");
+    deleteBtn.className = "delete-btn food-delete-btn";
+    deleteBtn.textContent = "Delete";
+    deleteBtn.onclick = () => openDeleteFoodModal(log.id);
+    actions.appendChild(deleteBtn);
+
+    const editBtn = document.createElement("button");
+    editBtn.className = "edit-btn";
+    editBtn.textContent = "Edit";
+    editBtn.onclick = () => openEditFoodModal(log);
+    actions.appendChild(editBtn);
+
+    li.appendChild(actions);
+    return li;
+}
+
 function renderFoodList(logs) {
     const listElement = document.getElementById("calorie-list");
     const emptyLabel = document.getElementById("food-empty");
@@ -570,48 +655,49 @@ function renderFoodList(logs) {
     if (!listElement || !emptyLabel) return;
 
     listElement.innerHTML = "";
-    let total = 0;
 
     if (logs.length === 0) {
         emptyLabel.style.display = "block";
-    } else {
-        emptyLabel.style.display = "none";
+        foodCaloriesTotal = 0;
+        updateCalorieTotals();
+        return;
     }
+
+    emptyLabel.style.display = "none";
+
+    const groups = { breakfast: [], lunch: [], dinner: [], snack: [] };
+    let total = 0;
 
     logs.forEach(log => {
         total += log.calories;
+        groups[mealForLog(log)].push(log);
+    });
 
-        const li = document.createElement("li");
-        li.className = "item food-item";
+    MEAL_ORDER.forEach(meal => {
+        const entries = groups[meal];
+        if (entries.length === 0) return;
 
-        const itemInfo = document.createElement("div");
-        itemInfo.className = "item-info";
+        const groupSubtotal = entries.reduce((sum, log) => sum + log.calories, 0);
 
-        const strong = document.createElement("strong");
-        strong.textContent = log.food_name;
-        itemInfo.appendChild(strong);
-        itemInfo.append(` - ${log.calories} kcal`);
+        const groupDiv = document.createElement("div");
+        groupDiv.className = "meal-group";
 
-        li.appendChild(itemInfo);
+        const heading = document.createElement("h3");
+        heading.className = "meal-heading";
+        heading.textContent = MEAL_LABELS[meal];
 
-        const actions = document.createElement("div");
-        actions.className = "actions";
+        const subtotal = document.createElement("span");
+        subtotal.className = "meal-subtotal";
+        subtotal.textContent = `${groupSubtotal} kcal`;
+        heading.appendChild(subtotal);
 
-        const deleteBtn = document.createElement("button");
-        deleteBtn.className = "delete-btn food-delete-btn";
-        deleteBtn.textContent = "Delete";
-        deleteBtn.onclick = () => openDeleteFoodModal(log.id);
-        actions.appendChild(deleteBtn);
+        groupDiv.appendChild(heading);
 
-        const editBtn = document.createElement("button");
-        editBtn.className = "edit-btn";
-        editBtn.textContent = "Edit";
-        editBtn.onclick = () => openEditFoodModal(log);
-        actions.appendChild(editBtn);
+        const ul = document.createElement("ul");
+        entries.forEach(log => ul.appendChild(buildFoodListItem(log)));
+        groupDiv.appendChild(ul);
 
-        li.appendChild(actions);
-
-        listElement.appendChild(li);
+        listElement.appendChild(groupDiv);
     });
 
     foodCaloriesTotal = total;
@@ -623,6 +709,9 @@ async function openAddFoodModal() {
     if (modal) {
         modal.style.display = "block";
     }
+
+    const mealSelect = document.getElementById("food-meal");
+    if (mealSelect) mealSelect.value = defaultMealForNow();
 
     try {
         const response = await fetch("/foods", {
@@ -677,6 +766,7 @@ function filterFoodSearch(query) {
                 foodSearch.value = f.name;
             }
             selectedFood = f;
+            applyFoodUnitToInput(f, "food-grams");
             resultsEl.innerHTML = "";
             resultsEl.style.display = "none";
         };
@@ -696,14 +786,19 @@ function closeAddFoodModal() {
     const foodGrams = document.getElementById("food-grams");
     const foodError = document.getElementById("food-error");
     const foodResults = document.getElementById("food-results");
+    const foodMeal = document.getElementById("food-meal");
 
     if (foodSearch) foodSearch.value = "";
-    if (foodGrams) foodGrams.value = "";
+    if (foodGrams) {
+        foodGrams.value = "";
+        foodGrams.placeholder = "Grams";
+    }
     if (foodError) foodError.style.display = "none";
     if (foodResults) {
         foodResults.innerHTML = "";
         foodResults.style.display = "none";
     }
+    if (foodMeal) foodMeal.value = "breakfast";
 
     foodList = [];
     selectedFood = null;
@@ -722,8 +817,11 @@ async function addFoodEntry() {
         return;
     }
 
+    const unitLabel = unitLabelForFood(selectedFood);
+    const unitWord = unitLabel.toLowerCase();
+
     if (!gramsInput) {
-        errorEl.textContent = "Please enter the amount in grams.";
+        errorEl.textContent = `Please enter the amount in ${unitWord}.`;
         errorEl.style.display = "block";
         return;
     }
@@ -731,19 +829,22 @@ async function addFoodEntry() {
     const grams = parseFloat(gramsInput);
 
     if (isNaN(grams) || grams <= 0) {
-        errorEl.textContent = "Grams must be a positive number.";
+        errorEl.textContent = `${unitLabel} must be a positive number.`;
         errorEl.style.display = "block";
         return;
     }
 
     const decimalParts = gramsInput.split(".");
     if (decimalParts.length === 2 && decimalParts[1].length > 2) {
-        errorEl.textContent = "Grams can have at most 2 decimal places (e.g. 0.25).";
+        errorEl.textContent = `${unitLabel} can have at most 2 decimal places (e.g. 0.25).`;
         errorEl.style.display = "block";
         return;
     }
 
-    const calories = Math.round((selectedFood.calories / selectedFood.serving_size_g) * grams);
+    const servingSize = servingSizeOf(selectedFood);
+    const calories = Math.round((selectedFood.calories / servingSize) * grams);
+    const mealSelect = document.getElementById("food-meal");
+    const meal = mealSelect && MEAL_ORDER.includes(mealSelect.value) ? mealSelect.value : defaultMealForNow();
 
     try {
         const response = await fetch("/food-logs", {
@@ -752,7 +853,9 @@ async function addFoodEntry() {
             body: JSON.stringify({
                 food_name: selectedFood.name,
                 calories: calories,
-                grams: grams,
+                amount: grams,
+                unit: unitCodeForFood(selectedFood),
+                meal: meal,
                 log_date: formatTrackerDateForApi(trackerSelectedDate)
             })
         });
@@ -857,14 +960,21 @@ async function openEditFoodModal(log) {
     searchInput.value = log.food_name;
     searchInput.oninput = () => filterEditFoodSearch(searchInput.value);
 
-    if (log.grams != null) {
-        gramsInput.value = log.grams;
+    applyFoodUnitToInput(selectedEditFood, "edit-food-grams");
+
+    const existingAmount = log.amount != null ? log.amount : log.grams;
+    if (existingAmount != null) {
+        gramsInput.value = existingAmount;
     } else if (selectedEditFood) {
-        const derived = (log.calories * selectedEditFood.serving_size_g) / selectedEditFood.calories;
+        const ss = servingSizeOf(selectedEditFood);
+        const derived = (log.calories * ss) / selectedEditFood.calories;
         gramsInput.value = derived.toFixed(2);
     } else {
         gramsInput.value = "";
     }
+
+    const mealSelect = document.getElementById("edit-food-meal");
+    if (mealSelect) mealSelect.value = mealForLog(log);
 }
 
 function filterEditFoodSearch(query) {
@@ -894,6 +1004,7 @@ function filterEditFoodSearch(query) {
             const searchInput = document.getElementById("edit-food-search");
             if (searchInput) searchInput.value = f.name;
             selectedEditFood = f;
+            applyFoodUnitToInput(f, "edit-food-grams");
             resultsEl.innerHTML = "";
             resultsEl.style.display = "none";
         };
@@ -911,14 +1022,19 @@ function closeEditFoodModal() {
     const gramsInput = document.getElementById("edit-food-grams");
     const errorEl = document.getElementById("edit-food-error");
     const resultsEl = document.getElementById("edit-food-results");
+    const mealSelect = document.getElementById("edit-food-meal");
 
     if (searchInput) searchInput.value = "";
-    if (gramsInput) gramsInput.value = "";
+    if (gramsInput) {
+        gramsInput.value = "";
+        gramsInput.placeholder = "Grams";
+    }
     if (errorEl) errorEl.style.display = "none";
     if (resultsEl) {
         resultsEl.innerHTML = "";
         resultsEl.style.display = "none";
     }
+    if (mealSelect) mealSelect.value = "breakfast";
 
     foodLogToEdit = null;
     selectedEditFood = null;
@@ -938,28 +1054,34 @@ async function saveFoodEdit() {
         return;
     }
 
+    const unitLabel = unitLabelForFood(selectedEditFood);
+    const unitWord = unitLabel.toLowerCase();
+
     const gramsRaw = gramsInput.value.trim();
     if (!gramsRaw) {
-        errorEl.textContent = "Please enter the amount in grams.";
+        errorEl.textContent = `Please enter the amount in ${unitWord}.`;
         errorEl.style.display = "block";
         return;
     }
 
     const grams = parseFloat(gramsRaw);
     if (isNaN(grams) || grams <= 0) {
-        errorEl.textContent = "Grams must be a positive number.";
+        errorEl.textContent = `${unitLabel} must be a positive number.`;
         errorEl.style.display = "block";
         return;
     }
 
     const decimalParts = gramsRaw.split(".");
     if (decimalParts.length === 2 && decimalParts[1].length > 2) {
-        errorEl.textContent = "Grams can have at most 2 decimal places (e.g. 0.25).";
+        errorEl.textContent = `${unitLabel} can have at most 2 decimal places (e.g. 0.25).`;
         errorEl.style.display = "block";
         return;
     }
 
-    const calories = Math.round((selectedEditFood.calories / selectedEditFood.serving_size_g) * grams);
+    const servingSize = servingSizeOf(selectedEditFood);
+    const calories = Math.round((selectedEditFood.calories / servingSize) * grams);
+    const mealSelect = document.getElementById("edit-food-meal");
+    const meal = mealSelect && MEAL_ORDER.includes(mealSelect.value) ? mealSelect.value : mealForLog(foodLogToEdit);
 
     try {
         const response = await fetch(`/food-logs/${foodLogToEdit.id}`, {
@@ -968,7 +1090,9 @@ async function saveFoodEdit() {
             body: JSON.stringify({
                 food_name: selectedEditFood.name,
                 calories: calories,
-                grams: grams
+                amount: grams,
+                unit: unitCodeForFood(selectedEditFood),
+                meal: meal
             })
         });
 
@@ -1452,6 +1576,273 @@ async function saveExerciseEdit() {
         }
     } catch (error) {
         console.error("Error updating exercise log:", error);
+        errorEl.textContent = "Something went wrong.";
+        errorEl.style.display = "block";
+    }
+}
+
+// ---------- Water section ----------
+async function loadWaterLogs() {
+    try {
+        const dateParam = formatTrackerDateForApi(trackerSelectedDate);
+        const response = await fetch(`/water-logs?date=${dateParam}`, {
+            headers: getAuthHeaders(false)
+        });
+
+        if (response.status === 401) {
+            logoutUser();
+            return;
+        }
+
+        const data = await response.json();
+        renderWaterList(data);
+    } catch (error) {
+        console.error("Error fetching water logs:", error);
+    }
+}
+
+function renderWaterList(logs) {
+    const listElement = document.getElementById("water-list");
+    const emptyLabel = document.getElementById("water-empty");
+    const totalLabel = document.getElementById("water-total-label");
+    if (!listElement || !emptyLabel) return;
+
+    listElement.innerHTML = "";
+    let total = 0;
+
+    if (logs.length === 0) {
+        emptyLabel.style.display = "block";
+    } else {
+        emptyLabel.style.display = "none";
+    }
+
+    logs.forEach(log => {
+        total += log.amount_ml;
+
+        const li = document.createElement("li");
+        li.className = "item water-item";
+
+        const itemInfo = document.createElement("div");
+        itemInfo.className = "item-info";
+
+        const strong = document.createElement("strong");
+        strong.textContent = "Water";
+        itemInfo.appendChild(strong);
+        itemInfo.append(` - ${log.amount_ml} mL`);
+
+        li.appendChild(itemInfo);
+
+        const actions = document.createElement("div");
+        actions.className = "actions";
+
+        const deleteBtn = document.createElement("button");
+        deleteBtn.className = "delete-btn water-delete-btn";
+        deleteBtn.textContent = "Delete";
+        deleteBtn.onclick = () => openDeleteWaterModal(log.id);
+        actions.appendChild(deleteBtn);
+
+        const editBtn = document.createElement("button");
+        editBtn.className = "edit-btn";
+        editBtn.textContent = "Edit";
+        editBtn.onclick = () => openEditWaterModal(log);
+        actions.appendChild(editBtn);
+
+        li.appendChild(actions);
+
+        listElement.appendChild(li);
+    });
+
+    if (totalLabel) totalLabel.textContent = `(${total} mL)`;
+}
+
+function openAddWaterModal() {
+    const modal = document.getElementById("add-water-modal");
+    if (modal) modal.style.display = "block";
+
+    const amountInput = document.getElementById("water-amount");
+    if (amountInput) amountInput.focus();
+}
+
+function closeAddWaterModal() {
+    const modal = document.getElementById("add-water-modal");
+    if (modal) modal.style.display = "none";
+
+    const amountInput = document.getElementById("water-amount");
+    const errorEl = document.getElementById("water-error");
+
+    if (amountInput) amountInput.value = "";
+    if (errorEl) errorEl.style.display = "none";
+}
+
+async function addWaterEntry() {
+    const amountInput = document.getElementById("water-amount");
+    const errorEl = document.getElementById("water-error");
+
+    if (!amountInput || !errorEl) return;
+    errorEl.style.display = "none";
+
+    const raw = amountInput.value.trim();
+    if (!raw) {
+        errorEl.textContent = "Please enter the amount in mL.";
+        errorEl.style.display = "block";
+        return;
+    }
+
+    const amount = parseInt(raw, 10);
+    if (isNaN(amount) || amount <= 0) {
+        errorEl.textContent = "Amount must be a positive whole number.";
+        errorEl.style.display = "block";
+        return;
+    }
+
+    try {
+        const response = await fetch("/water-logs", {
+            method: "POST",
+            headers: getAuthHeaders(),
+            body: JSON.stringify({
+                amount_ml: amount,
+                log_date: formatTrackerDateForApi(trackerSelectedDate)
+            })
+        });
+
+        if (response.status === 401) {
+            logoutUser();
+            return;
+        }
+
+        if (response.ok) {
+            closeAddWaterModal();
+            loadWaterLogs();
+        } else {
+            const data = await response.json().catch(() => ({}));
+            errorEl.textContent = data.detail || "Failed to log water.";
+            errorEl.style.display = "block";
+        }
+    } catch (error) {
+        console.error("Error logging water:", error);
+        errorEl.textContent = "Something went wrong.";
+        errorEl.style.display = "block";
+    }
+}
+
+let waterLogToDelete = null;
+
+function openDeleteWaterModal(logId) {
+    waterLogToDelete = logId;
+    document.getElementById("delete-water-modal").style.display = "block";
+}
+
+function closeDeleteWaterModal() {
+    waterLogToDelete = null;
+    document.getElementById("delete-water-modal").style.display = "none";
+}
+
+async function confirmDeleteWater() {
+    if (!waterLogToDelete) {
+        closeDeleteWaterModal();
+        return;
+    }
+
+    try {
+        const response = await fetch(`/water-logs/${waterLogToDelete}`, {
+            method: "DELETE",
+            headers: getAuthHeaders(false)
+        });
+
+        if (response.status === 401) {
+            logoutUser();
+            return;
+        }
+
+        if (response.ok) {
+            closeDeleteWaterModal();
+            loadWaterLogs();
+        } else {
+            const data = await response.json().catch(() => ({}));
+            alert(data.detail || "Failed to delete water log.");
+            closeDeleteWaterModal();
+        }
+    } catch (error) {
+        console.error("Error deleting water log:", error);
+        alert("Something went wrong.");
+        closeDeleteWaterModal();
+    }
+}
+
+let waterLogToEdit = null;
+
+function openEditWaterModal(log) {
+    waterLogToEdit = log;
+
+    const modal = document.getElementById("edit-water-modal");
+    const amountInput = document.getElementById("edit-water-amount");
+    const errorEl = document.getElementById("edit-water-error");
+
+    if (!modal || !amountInput) return;
+
+    if (errorEl) errorEl.style.display = "none";
+    amountInput.value = log.amount_ml;
+
+    modal.style.display = "block";
+    amountInput.focus();
+}
+
+function closeEditWaterModal() {
+    const modal = document.getElementById("edit-water-modal");
+    if (modal) modal.style.display = "none";
+
+    const amountInput = document.getElementById("edit-water-amount");
+    const errorEl = document.getElementById("edit-water-error");
+
+    if (amountInput) amountInput.value = "";
+    if (errorEl) errorEl.style.display = "none";
+
+    waterLogToEdit = null;
+}
+
+async function saveWaterEdit() {
+    const amountInput = document.getElementById("edit-water-amount");
+    const errorEl = document.getElementById("edit-water-error");
+
+    if (!amountInput || !errorEl || !waterLogToEdit) return;
+    errorEl.style.display = "none";
+
+    const raw = amountInput.value.trim();
+    if (!raw) {
+        errorEl.textContent = "Please enter the amount in mL.";
+        errorEl.style.display = "block";
+        return;
+    }
+
+    const amount = parseInt(raw, 10);
+    if (isNaN(amount) || amount <= 0) {
+        errorEl.textContent = "Amount must be a positive whole number.";
+        errorEl.style.display = "block";
+        return;
+    }
+
+    try {
+        const response = await fetch(`/water-logs/${waterLogToEdit.id}`, {
+            method: "PUT",
+            headers: getAuthHeaders(),
+            body: JSON.stringify({ amount_ml: amount })
+        });
+
+        if (response.status === 401) {
+            logoutUser();
+            return;
+        }
+
+        if (response.ok) {
+            closeEditWaterModal();
+            loadWaterLogs();
+        } else {
+            const data = await response.json().catch(() => ({}));
+            errorEl.textContent = data.detail || "Failed to update water log.";
+            errorEl.style.display = "block";
+        }
+    } catch (error) {
+        console.error("Error updating water log:", error);
         errorEl.textContent = "Something went wrong.";
         errorEl.style.display = "block";
     }

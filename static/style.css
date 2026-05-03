@@ -216,9 +216,51 @@ button:active {
     background-color: #dc2626;
 }
 
+.section-subtotal {
+    font-size: 0.95rem;
+    font-weight: 500;
+    color: var(--primary);
+    margin-left: 6px;
+}
+
+.meal-group {
+    margin-bottom: 18px;
+}
+
+.meal-group:last-child {
+    margin-bottom: 0;
+}
+
+.meal-heading {
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: var(--text);
+    margin: 0 0 8px 2px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+}
+
+.meal-subtotal {
+    font-size: 0.85rem;
+    font-weight: 500;
+    color: var(--primary);
+    text-transform: none;
+    letter-spacing: normal;
+}
+
+.meal-group ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
 /* ---------- Lists ---------- */
 #calorie-list,
-#exercise-list {
+#exercise-list,
+#water-list {
     list-style: none;
     padding: 0;
     margin: 0;
@@ -250,7 +292,8 @@ button:active {
 }
 
 .food-item .actions,
-.exercise-item .actions {
+.exercise-item .actions,
+.water-item .actions {
     opacity: 0;
     pointer-events: none;
     transition: opacity 0.15s ease;
@@ -258,8 +301,10 @@ button:active {
 
 .food-item:hover .actions,
 .exercise-item:hover .actions,
+.water-item:hover .actions,
 .food-item:focus-within .actions,
-.exercise-item:focus-within .actions {
+.exercise-item:focus-within .actions,
+.water-item:focus-within .actions {
     opacity: 1;
     pointer-events: auto;
 }

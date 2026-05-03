@@ -77,6 +77,8 @@ exercises_collection = database["Exercises"]
 exercise_logs_collection = database["Exercise_logs"]
 posts_collection = database["Posts"]
 exercise_logs_archive_collection = database["Exercise_logs_archive"]
+water_logs_collection = database["Water_logs"]
+water_logs_archive_collection = database["Water_logs_archive"]
 
 # ---------- Security ----------
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -164,26 +166,36 @@ class TokenResponse(BaseModel):
     user: UserOut
 
 
+VALID_MEALS = {"breakfast", "lunch", "dinner", "snack"}
+VALID_FOOD_UNITS = {"g", "mL"}
+
+
 class FoodLog(BaseModel):
     id: Optional[str] = None
     user_id: str
     food_name: str
     calories: int
-    grams: Optional[float] = None
+    amount: Optional[float] = None
+    unit: Optional[str] = None
+    meal: Optional[str] = None
     created_at: Optional[str] = None
 
 
 class FoodLogCreate(BaseModel):
     food_name: str
     calories: int
-    grams: Optional[float] = None
+    amount: Optional[float] = None
+    unit: Optional[str] = None
+    meal: Optional[str] = None
     log_date: Optional[str] = None
 
 
 class FoodLogUpdate(BaseModel):
     food_name: str
     calories: int
-    grams: Optional[float] = None
+    amount: Optional[float] = None
+    unit: Optional[str] = None
+    meal: Optional[str] = None
 
 
 class ExerciseLog(BaseModel):
@@ -206,6 +218,22 @@ class ExerciseLogUpdate(BaseModel):
     exercise_name: str
     calories_burned: int
     hours: Optional[float] = None
+
+
+class WaterLog(BaseModel):
+    id: Optional[str] = None
+    user_id: str
+    amount_ml: int
+    created_at: Optional[str] = None
+
+
+class WaterLogCreate(BaseModel):
+    amount_ml: int
+    log_date: Optional[str] = None
+
+
+class WaterLogUpdate(BaseModel):
+    amount_ml: int
 
 
 class UserSummary(BaseModel):
@@ -298,7 +326,9 @@ def serialize_food_log(log) -> dict:
         "user_id": log["user_id"],
         "food_name": log["food_name"],
         "calories": log["calories"],
-        "grams": log.get("grams"),
+        "amount": log.get("amount", log.get("grams")),
+        "unit": log.get("unit", "g"),
+        "meal": log.get("meal"),
         "created_at": log["created_at"].isoformat() if "created_at" in log and log["created_at"] else None
     }
 
@@ -310,6 +340,15 @@ def serialize_exercise_log(log) -> dict:
         "exercise_name": log["exercise_name"],
         "calories_burned": log["calories_burned"],
         "hours": log.get("hours"),
+        "created_at": log["created_at"].isoformat() if "created_at" in log and log["created_at"] else None
+    }
+
+
+def serialize_water_log(log) -> dict:
+    return {
+        "id": str(log["_id"]),
+        "user_id": log["user_id"],
+        "amount_ml": log["amount_ml"],
         "created_at": log["created_at"].isoformat() if "created_at" in log and log["created_at"] else None
     }
 
@@ -390,12 +429,17 @@ def get_me(current_user=Depends(get_current_user)):
 # ---------- Food routes ----------
 @app.get("/foods")
 def get_foods(current_user=Depends(get_current_user)):
-    foods = foods_collection.find({}, {"_id": 0, "name": 1, "calories": 1, "serving_size_g": 1})
+    foods = foods_collection.find(
+        {},
+        {"_id": 0, "name": 1, "calories": 1, "serving_size_g": 1, "serving_size": 1, "serving_unit": 1, "category": 1}
+    )
     return [
         {
             "name": f["name"],
             "calories": f["calories"],
-            "serving_size_g": f["serving_size_g"]
+            "serving_size": f.get("serving_size", f.get("serving_size_g")),
+            "serving_unit": f.get("serving_unit", "g"),
+            "category": f.get("category", "food"),
         }
         for f in foods
     ]
@@ -418,11 +462,19 @@ def get_food_logs(date: Optional[str] = None, current_user=Depends(get_current_u
 def add_food_log(log: FoodLogCreate, current_user=Depends(get_current_user)):
     user_id = str(current_user["_id"])
 
+    if log.meal is not None and log.meal not in VALID_MEALS:
+        raise HTTPException(status_code=400, detail="Meal must be breakfast, lunch, dinner, or snack")
+
+    if log.unit is not None and log.unit not in VALID_FOOD_UNITS:
+        raise HTTPException(status_code=400, detail="Unit must be 'g' or 'mL'")
+
     log_dict = {
         "user_id": user_id,
         "food_name": log.food_name,
         "calories": log.calories,
-        "grams": log.grams,
+        "amount": log.amount,
+        "unit": log.unit or "g",
+        "meal": log.meal,
         "created_at": created_at_for_log_date(log.log_date)
     }
 
@@ -434,12 +486,13 @@ def add_food_log(log: FoodLogCreate, current_user=Depends(get_current_user)):
         raise HTTPException(status_code=500, detail="Food log creation failed")
 
     logger.info(
-        "Food log added: user_id=%s log_id=%s food=%s calories=%s grams=%s log_date=%s",
+        "Food log added: user_id=%s log_id=%s food=%s calories=%s amount=%s unit=%s log_date=%s",
         user_id,
         str(new_log["_id"]),
         log.food_name,
         log.calories,
-        log.grams,
+        log.amount,
+        log.unit,
         log.log_date
     )
 
@@ -452,6 +505,13 @@ def update_food_log(log_id: str, log: FoodLogUpdate, current_user=Depends(get_cu
         raise HTTPException(status_code=400, detail="Invalid food log ID")
 
     user_id = str(current_user["_id"])
+
+    if log.meal is not None and log.meal not in VALID_MEALS:
+        raise HTTPException(status_code=400, detail="Meal must be breakfast, lunch, dinner, or snack")
+
+    if log.unit is not None and log.unit not in VALID_FOOD_UNITS:
+        raise HTTPException(status_code=400, detail="Unit must be 'g' or 'mL'")
+
     existing = food_logs_collection.find_one({"_id": ObjectId(log_id), "user_id": user_id})
 
     if not existing:
@@ -459,22 +519,28 @@ def update_food_log(log_id: str, log: FoodLogUpdate, current_user=Depends(get_cu
 
     food_logs_collection.update_one(
         {"_id": ObjectId(log_id)},
-        {"$set": {
-            "food_name": log.food_name,
-            "calories": log.calories,
-            "grams": log.grams
-        }}
+        {
+            "$set": {
+                "food_name": log.food_name,
+                "calories": log.calories,
+                "amount": log.amount,
+                "unit": log.unit or "g",
+                "meal": log.meal
+            },
+            "$unset": {"grams": ""}
+        }
     )
 
     updated = food_logs_collection.find_one({"_id": ObjectId(log_id)})
 
     logger.info(
-        "Food log updated: user_id=%s log_id=%s food=%s calories=%s grams=%s",
+        "Food log updated: user_id=%s log_id=%s food=%s calories=%s amount=%s unit=%s",
         user_id,
         log_id,
         log.food_name,
         log.calories,
-        log.grams
+        log.amount,
+        log.unit
     )
 
     return serialize_food_log(updated)
@@ -583,6 +649,102 @@ def update_exercise_log(log_id: str, log: ExerciseLogUpdate, current_user=Depend
     )
 
     return serialize_exercise_log(updated)
+
+
+# ---------- Water routes ----------
+@app.get("/water-logs", response_model=List[WaterLog])
+def get_water_logs(date: Optional[str] = None, current_user=Depends(get_current_user)):
+    user_id = str(current_user["_id"])
+    query = {"user_id": user_id}
+
+    if date:
+        start, end = day_range_utc(date)
+        query["created_at"] = {"$gte": start, "$lt": end}
+
+    logs = water_logs_collection.find(query)
+    return [serialize_water_log(log) for log in logs]
+
+
+@app.post("/water-logs", response_model=WaterLog, status_code=status.HTTP_201_CREATED)
+def add_water_log(log: WaterLogCreate, current_user=Depends(get_current_user)):
+    user_id = str(current_user["_id"])
+
+    if log.amount_ml <= 0:
+        raise HTTPException(status_code=400, detail="Amount must be greater than 0")
+
+    log_dict = {
+        "user_id": user_id,
+        "amount_ml": log.amount_ml,
+        "created_at": created_at_for_log_date(log.log_date)
+    }
+
+    result = water_logs_collection.insert_one(log_dict)
+    new_log = water_logs_collection.find_one({"_id": result.inserted_id})
+
+    if not new_log:
+        logger.error("Water log creation failed: user_id=%s amount_ml=%s", user_id, log.amount_ml)
+        raise HTTPException(status_code=500, detail="Water log creation failed")
+
+    logger.info(
+        "Water log added: user_id=%s log_id=%s amount_ml=%s log_date=%s",
+        user_id,
+        str(new_log["_id"]),
+        log.amount_ml,
+        log.log_date
+    )
+
+    return serialize_water_log(new_log)
+
+
+@app.put("/water-logs/{log_id}", response_model=WaterLog)
+def update_water_log(log_id: str, log: WaterLogUpdate, current_user=Depends(get_current_user)):
+    if not ObjectId.is_valid(log_id):
+        raise HTTPException(status_code=400, detail="Invalid water log ID")
+
+    if log.amount_ml <= 0:
+        raise HTTPException(status_code=400, detail="Amount must be greater than 0")
+
+    user_id = str(current_user["_id"])
+    existing = water_logs_collection.find_one({"_id": ObjectId(log_id), "user_id": user_id})
+
+    if not existing:
+        raise HTTPException(status_code=404, detail="Water log not found")
+
+    water_logs_collection.update_one(
+        {"_id": ObjectId(log_id)},
+        {"$set": {"amount_ml": log.amount_ml}}
+    )
+
+    updated = water_logs_collection.find_one({"_id": ObjectId(log_id)})
+
+    logger.info(
+        "Water log updated: user_id=%s log_id=%s amount_ml=%s",
+        user_id,
+        log_id,
+        log.amount_ml
+    )
+
+    return serialize_water_log(updated)
+
+
+@app.delete("/water-logs/{log_id}", status_code=status.HTTP_204_NO_CONTENT)
+def archive_water_log(log_id: str, current_user=Depends(get_current_user)):
+    if not ObjectId.is_valid(log_id):
+        raise HTTPException(status_code=400, detail="Invalid water log ID")
+
+    user_id = str(current_user["_id"])
+    log = water_logs_collection.find_one({"_id": ObjectId(log_id), "user_id": user_id})
+
+    if not log:
+        raise HTTPException(status_code=404, detail="Water log not found")
+
+    water_logs_archive_collection.insert_one(log)
+    water_logs_collection.delete_one({"_id": ObjectId(log_id)})
+
+    logger.info("Water log archived: user_id=%s log_id=%s", user_id, log_id)
+
+    return
+
 
 # ---------- Stats Page routes ----------
 @app.get("/weekly-recap", response_model=WeeklyRecapOut)
@@ -998,6 +1160,7 @@ def delete_user(user_id: str, current_user=Depends(require_admin)):
 
     food_logs_collection.delete_many({"user_id": user_id})
     exercise_logs_collection.delete_many({"user_id": user_id})
+    water_logs_collection.delete_many({"user_id": user_id})
 
     logger.info("User deleted by admin: admin_user_id=%s deleted_user_id=%s", str(current_user["_id"]), user_id)
 
