@@ -497,13 +497,22 @@ async function renderPlot(graphContainer=null) {
         title: {
             text: "Calories Burned/Gained",
         },
+        dragmode: "pan",
     }
 
     let config = {
         scrollZoom: true,
+        responsive: true,
+        displaylogo: false,
+        modeBarButtonsToRemove: [
+            "toImage", "zoom2d", "pan2d", "select2d", "lasso2d", "autoScale2d",
+        ],
     }
 
-    Plotly.react(graphContainer, data, layout, config);
+    Plotly.newPlot(graphContainer, data, layout, config);
+
+    let new_dld_btn = document.getElementById("download-graph");
+    new_dld_btn.onclick = () => Plotly.downloadImage('graph-container', {filename: `nutri-daily-graph-${formatTrackerDateForApi(trackerSelectedDate)}`});
 }
 
 // ---------- Food section ----------
