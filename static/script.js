@@ -334,14 +334,8 @@ function changeTrackerDate(deltaDays) {
 function setTrackerSelectedDate(date) {
     trackerSelectedDate = startOfLocalDay(date);
 
-    foodCaloriesTotal = 0;
-    exerciseCaloriesTotal = 0;
-    updateCalorieTotals();
-
     renderTrackerDateLabel();
     syncTrackerDateInput();
-    loadFoodLogs();
-    loadExerciseLogs();
 }
 
 function syncTrackerDateInput() {
@@ -393,6 +387,14 @@ async function setupCaloriePage() {
     loadExerciseLogs();
 }
 
+function updateCaloriePage() {
+    foodCaloriesTotal = 0;
+    exerciseCaloriesTotal = 0;
+    updateCalorieTotals();
+    loadFoodLogs();
+    loadExerciseLogs();
+}
+
 // ---------- Stats page ----------
 async function setupStatsPage() {
     const graphContainer = document.getElementById("graph-container");
@@ -412,6 +414,14 @@ async function setupStatsPage() {
     }
 
     renderUserHeader(currentUser);
+
+    renderPlot(graphContainer);
+}
+
+async function renderPlot(graphContainer=null) {
+    if (graphContainer === null) {
+        graphContainer = document.getElementById("graph-container");
+    }
 
     let food     = await fetchFoodLogs();
     let exercise = await fetchExerciseLogs();
@@ -493,7 +503,7 @@ async function setupStatsPage() {
         scrollZoom: true,
     }
 
-    Plotly.newPlot(graphContainer, data, layout, config);
+    Plotly.react(graphContainer, data, layout, config);
 }
 
 // ---------- Food section ----------

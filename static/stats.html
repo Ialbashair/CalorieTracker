@@ -72,12 +72,14 @@
         <div id="visualizations-tab" class="stats-tab-content" style="display: none;">
             <section class="section">
                 <div class="section-header">
-                    <div>
                         <h2>Visualizations</h2>
-                        <p class="section-subtext">Charts and deeper progress tracking can go here.</p>
-                    </div>
                 </div>
-
+                <div class="date-nav">
+                    <button type="button" class="date-arrow" onclick="changeTrackerDate(-1);renderPlot()" aria-label="Previous day">‹</button>
+                    <button type="button" id="tracker-date-display" onclick="openTrackerDatePicker();renderPlot()" aria-label="Pick a date">Today</button>
+                    <input type="date" id="tracker-date-input" class="tracker-date-input-hidden" onchange="onTrackerDatePicked(this.value);renderPlot()">
+                    <button type="button" class="date-arrow" onclick="changeTrackerDate(1);renderPlot()" aria-label="Next day">›</button>
+                </div>
                 <div id="graph-container"></div>
             </section>
         </div>

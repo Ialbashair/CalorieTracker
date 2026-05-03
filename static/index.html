@@ -29,10 +29,10 @@
         </header>
 
         <div class="date-nav">
-            <button type="button" class="date-arrow" onclick="changeTrackerDate(-1)" aria-label="Previous day">‹</button>
-            <button type="button" id="tracker-date-display" onclick="openTrackerDatePicker()" aria-label="Pick a date">Today</button>
-            <input type="date" id="tracker-date-input" class="tracker-date-input-hidden" onchange="onTrackerDatePicked(this.value)">
-            <button type="button" class="date-arrow" onclick="changeTrackerDate(1)" aria-label="Next day">›</button>
+            <button type="button" class="date-arrow" onclick="changeTrackerDate(-1);updateCaloriePage()" aria-label="Previous day">‹</button>
+            <button type="button" id="tracker-date-display" onclick="openTrackerDatePicker();updateCaloriePage()" aria-label="Pick a date">Today</button>
+            <input type="date" id="tracker-date-input" class="tracker-date-input-hidden" onchange="onTrackerDatePicked(this.value);updateCaloriePage()">
+            <button type="button" class="date-arrow" onclick="changeTrackerDate(1);updateCaloriePage()" aria-label="Next day">›</button>
         </div>
 
         <div class="summary-card">
