@@ -3,6 +3,9 @@ console.log("SCRIPT.JS LOADED");
 const REGISTER_URL = "/register";
 const LOGIN_URL = "/login";
 
+// TEST
+
+
 // ---------- Feed state ----------
 let feedOffset = 0;
 let feedLimit = 10;
