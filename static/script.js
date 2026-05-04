@@ -254,18 +254,76 @@ async function setupHomePage() {
         userSinceEl.textContent = "User Since --";
     }
 
-    await loadHomeTodayStats();
+    await loadUserGoals();
+    await loadHomeDailyTotals();
 }
 
-async function loadHomeTodayStats() {
-    const consumedEl = document.getElementById("home-calories-consumed");
-    const burnedEl = document.getElementById("home-calories-burned");
-    const netEl = document.getElementById("home-net-calories");
-
-    if (!consumedEl || !burnedEl || !netEl) return;
-
+async function loadHomeDailyTotals() {
     try {
-        const response = await fetch("/home/today-stats", {
+        const today = formatTrackerDateForApi(startOfLocalDay(new Date()));
+
+        const foodResponse = await fetch(`/food-logs?date=${today}`, {
+            headers: getAuthHeaders(false)
+        });
+
+        const exerciseResponse = await fetch(`/exercise-logs?date=${today}`, {
+            headers: getAuthHeaders(false)
+        });
+
+        const waterResponse = await fetch(`/water-logs?date=${today}`, {
+            headers: getAuthHeaders(false)
+        });
+
+        if (
+            foodResponse.status === 401 ||
+            exerciseResponse.status === 401 ||
+            waterResponse.status === 401
+        ) {
+            logoutUser();
+            return;
+        }
+
+        const foodLogs = await foodResponse.json();
+        const exerciseLogs = await exerciseResponse.json();
+        const waterLogs = await waterResponse.json();
+
+        homeCaloriesConsumedToday = foodLogs.reduce((sum, log) => {
+            return sum + (Number(log.calories) || 0);
+        }, 0);
+
+        homeCaloriesBurnedToday = exerciseLogs.reduce((sum, log) => {
+            return sum + (Number(log.calories_burned) || 0);
+        }, 0);
+
+        homeWaterTotalToday = waterLogs.reduce((sum, log) => {
+            return sum + (Number(log.amount_ml) || 0);
+        }, 0);
+
+        const consumedEl = document.getElementById("home-calories-consumed");
+        const burnedEl = document.getElementById("home-calories-burned");
+        const netEl = document.getElementById("home-net-calories");
+
+        if (consumedEl) consumedEl.textContent = homeCaloriesConsumedToday;
+        if (burnedEl) burnedEl.textContent = homeCaloriesBurnedToday;
+        if (netEl) netEl.textContent = homeCaloriesConsumedToday - homeCaloriesBurnedToday;
+
+        updateHomeGoalProgress();
+    } catch (error) {
+        console.error("Error loading home daily totals:", error);
+
+        homeCaloriesConsumedToday = 0;
+        homeCaloriesBurnedToday = 0;
+        homeWaterTotalToday = 0;
+
+        updateHomeGoalProgress();
+    }
+}
+
+async function loadHomeWaterTotal() {
+    try {
+        const today = formatTrackerDateForApi(startOfLocalDay(new Date()));
+
+        const response = await fetch(`/water-logs?date=${today}`, {
             headers: getAuthHeaders(false)
         });
 
@@ -274,18 +332,46 @@ async function loadHomeTodayStats() {
             return;
         }
 
-        const data = await response.json();
+        const logs = await response.json();
 
-        consumedEl.textContent = data.calories_consumed_today ?? 0;
-        burnedEl.textContent = data.calories_burned_today ?? 0;
-        netEl.textContent = data.net_calories_today ?? 0;
+        homeWaterTotalToday = logs.reduce((sum, log) => {
+            return sum + (Number(log.amount_ml) || 0);
+        }, 0);
+
+        updateHomeGoalProgress();
     } catch (error) {
-        console.error("Error loading home today stats:", error);
-        consumedEl.textContent = "0";
-        burnedEl.textContent = "0";
-        netEl.textContent = "0";
+        console.error("Error loading home water total:", error);
+        homeWaterTotalToday = 0;
+        updateHomeGoalProgress();
     }
 }
+
+function updateHomeGoalProgress() {
+    updateGoalProgress(
+        "home-food-goal-label",
+        "home-food-goal-fill",
+        homeCaloriesConsumedToday,
+        userGoals.calorie_goal,
+        "kcal"
+    );
+
+    updateGoalProgress(
+        "home-exercise-goal-label",
+        "home-exercise-goal-fill",
+        homeCaloriesBurnedToday,
+        userGoals.exercise_goal,
+        "kcal burned"
+    );
+
+    updateGoalProgress(
+        "home-water-goal-label",
+        "home-water-goal-fill",
+        homeWaterTotalToday,
+        userGoals.water_goal_ml,
+        "mL"
+    );
+}
+
 
 // ---------- Tracker page ----------
 let trackerSelectedDate = startOfLocalDay(new Date());
@@ -335,8 +421,15 @@ function changeTrackerDate(deltaDays) {
 function setTrackerSelectedDate(date) {
     trackerSelectedDate = startOfLocalDay(date);
 
+    foodCaloriesTotal = 0;
+    exerciseCaloriesTotal = 0;
+    updateCalorieTotals();
+
     renderTrackerDateLabel();
     syncTrackerDateInput();
+    loadFoodLogs();
+    loadExerciseLogs();
+    loadWaterLogs();
 }
 
 function syncTrackerDateInput() {
@@ -362,6 +455,7 @@ function onTrackerDatePicked(value) {
     if (!y || !m || !d) return;
     setTrackerSelectedDate(new Date(y, m - 1, d));
 }
+
 async function setupCaloriePage() {
     const calorieList = document.getElementById("calorie-list");
     const totalDisplay = document.getElementById("total-calories");
@@ -384,8 +478,11 @@ async function setupCaloriePage() {
     trackerSelectedDate = startOfLocalDay(new Date());
     renderTrackerDateLabel();
     syncTrackerDateInput();
-    
-    updateCaloriePage();
+
+    await loadUserGoals();
+    loadFoodLogs();
+    loadExerciseLogs();
+    loadWaterLogs();
 }
 
 function updateCaloriePage() {
@@ -736,6 +833,17 @@ let foodList = [];
 let selectedFood = null;
 let foodCaloriesTotal = 0;
 let exerciseCaloriesTotal = 0;
+let waterTotal = 0;
+
+let userGoals = {
+    calorie_goal: 2000,
+    exercise_goal: 500,
+    water_goal_ml: 2000
+};
+
+let homeCaloriesConsumedToday = 0;
+let homeCaloriesBurnedToday = 0;
+let homeWaterTotalToday = 0;
 
 function updateCalorieTotals() {
     const inEl = document.getElementById("calories-in");
@@ -749,6 +857,83 @@ function updateCalorieTotals() {
     if (inEl) inEl.textContent = caloriesIn;
     if (outEl) outEl.textContent = caloriesOut;
     if (totalEl) totalEl.textContent = netCalories;
+}
+
+async function loadUserGoals() {
+    try {
+        const response = await fetch("/settings/goals", {
+            headers: getAuthHeaders(false)
+        });
+
+        if (response.status === 401) {
+            logoutUser();
+            return;
+        }
+
+        if (response.ok) {
+            userGoals = await response.json();
+            updateAllGoalProgress();
+            populateGoalSettingsInputs();
+        }
+    } catch (error) {
+        console.error("Error loading user goals:", error);
+    }
+}
+
+function updateAllGoalProgress() {
+    updateGoalProgress(
+        "food-goal-label",
+        "food-goal-fill",
+        foodCaloriesTotal,
+        userGoals.calorie_goal,
+        "kcal"
+    );
+
+    updateGoalProgress(
+        "exercise-goal-label",
+        "exercise-goal-fill",
+        exerciseCaloriesTotal,
+        userGoals.exercise_goal,
+        "kcal burned"
+    );
+
+    updateGoalProgress(
+        "water-goal-label",
+        "water-goal-fill",
+        waterTotal,
+        userGoals.water_goal_ml,
+        "mL"
+    );
+}
+
+function updateGoalProgress(labelId, fillId, current, goal, unit) {
+    const label = document.getElementById(labelId);
+    const fill = document.getElementById(fillId);
+
+    if (!label || !fill) return;
+
+    const safeCurrent = Number(current) || 0;
+    const safeGoal = Number(goal) || 1;
+    const percent = Math.min((safeCurrent / safeGoal) * 100, 100);
+
+    label.textContent = `${safeCurrent} / ${safeGoal} ${unit}`;
+    fill.style.width = `${percent}%`;
+
+    if (safeCurrent >= safeGoal) {
+        fill.classList.add("goal-complete");
+    } else {
+        fill.classList.remove("goal-complete");
+    }
+}
+
+function populateGoalSettingsInputs() {
+    const calorieInput = document.getElementById("settings-calorie-goal");
+    const exerciseInput = document.getElementById("settings-exercise-goal");
+    const waterInput = document.getElementById("settings-water-goal");
+
+    if (calorieInput) calorieInput.value = userGoals.calorie_goal;
+    if (exerciseInput) exerciseInput.value = userGoals.exercise_goal;
+    if (waterInput) waterInput.value = userGoals.water_goal_ml;
 }
 
 async function loadFoodLogs() {
@@ -3267,6 +3452,8 @@ async function setupSettingsPage() {
         themeSelect.value = localStorage.getItem("nutriTheme") || "light";
     }
     populateProfilePicturePreview(currentUser);
+
+    await loadUserGoals();
 }
 
 async function submitUsernameChange() {
