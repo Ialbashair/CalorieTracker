@@ -6,6 +6,7 @@
     <title>Nutri - Stats</title>
     <link rel="icon" type="image/x-icon" href="/static/favicon.ico">
     <link rel="stylesheet" href="/static/style.css">
+    <script src='https://cdn.plot.ly/plotly-3.4.0.min.js'></script>
     <script src="/static/script.js" defer></script>
 </head>
 <body>
@@ -71,16 +72,21 @@
         <div id="visualizations-tab" class="stats-tab-content" style="display: none;">
             <section class="section">
                 <div class="section-header">
-                    <div>
                         <h2>Visualizations</h2>
-                        <p class="section-subtext">Charts and deeper progress tracking can go here.</p>
-                    </div>
                 </div>
-
-                <div class="visualization-placeholder">
-                    <p>charts can be inserted here.</p>
+                <div class="date-nav">
+                    <button type="button" class="date-arrow" onclick="changeTrackerDate(-1);renderPlot()" aria-label="Previous day">‹</button>
+                    <button type="button" id="tracker-date-display" onclick="openTrackerDatePicker();renderPlot()" aria-label="Pick a date">Today</button>
+                    <input type="date" id="tracker-date-input" class="tracker-date-input-hidden" onchange="onTrackerDatePicked(this.value);renderPlot()">
+                    <button type="button" class="date-arrow" onclick="changeTrackerDate(1);renderPlot()" aria-label="Next day">›</button>
                 </div>
+                <div id="graph-container"></div>
             </section>
+            <div class="modal-actions">
+                <!-- <button class="save-btn" onclick="loadWeeklyRecap()">Refresh Recap</button> -->
+                <!-- <button class="add-section-btn" onclick="shareWeeklyRecap()">Share to Feed</button> -->
+                <button id="download-graph" class="save-btn" onclick="/*set by renderPlot()*/">Download Graph</button>
+            </div>
         </div>
     </div>
 </body>

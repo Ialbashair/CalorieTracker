@@ -267,17 +267,6 @@ class PasswordUpdate(BaseModel):
     current_password: str
     new_password: str
 
-class UserGoals(BaseModel):
-    calorie_goal: int = 2000
-    exercise_goal: int = 500
-    water_goal_ml: int = 2000
-
-
-class UserGoalsUpdate(BaseModel):
-    calorie_goal: int
-    exercise_goal: int
-    water_goal_ml: int
-
 class HomeTodayStats(BaseModel):
     calories_consumed_today: int
     calories_burned_today: int
@@ -312,13 +301,6 @@ def serialize_user(user) -> dict:
         "profile_picture": user.get("profile_picture")
     }
 
-def serialize_goals(user) -> dict:
-    return {
-        "calorie_goal": user.get("calorie_goal", 2000),
-        "exercise_goal": user.get("exercise_goal", 500),
-        "water_goal_ml": user.get("water_goal_ml", 2000)
-    }
-
 
 def day_range_utc(date_str: str) -> tuple[datetime, datetime]:
     try:
@@ -335,7 +317,7 @@ def created_at_for_log_date(log_date: Optional[str]) -> datetime:
     start, _ = day_range_utc(log_date)
 
     # Store at noon UTC so it safely lands inside the selected date bucket
-    return start + timedelta(hours=12)
+    return datetime.now(timezone.utc)
 
 
 def serialize_food_log(log) -> dict:
@@ -397,15 +379,12 @@ def register_user(user: UserCreate):
         raise HTTPException(status_code=400, detail="Username already taken")
 
     user_dict = {
-        "username": user.username,
-        "email": user.email,
-        "password": hash_password(user.password),
-        "role": "user",
-        "created_at": datetime.now(timezone.utc),
-        "calorie_goal": 2000,
-        "exercise_goal": 500,
-        "water_goal_ml": 2000
-    }
+    "username": user.username,
+    "email": user.email,
+    "password": hash_password(user.password),
+    "role": "user",
+    "created_at": datetime.now(timezone.utc)
+}
 
     result = users_collection.insert_one(user_dict)
     new_user = users_collection.find_one({"_id": result.inserted_id})
@@ -1155,48 +1134,6 @@ def upload_profile_picture(
     logger.info("Profile picture updated: user_id=%s path=%s", str(current_user["_id"]), public_path)
 
     return serialize_user(updated_user)
-
-@app.get("/settings/goals", response_model=UserGoals)
-def get_user_goals(current_user=Depends(get_current_user)):
-    return serialize_goals(current_user)
-
-
-@app.put("/settings/goals", response_model=UserGoals)
-def update_user_goals(
-    goals_update: UserGoalsUpdate,
-    current_user=Depends(get_current_user)
-):
-    if goals_update.calorie_goal <= 0:
-        raise HTTPException(status_code=400, detail="Calorie goal must be greater than 0")
-
-    if goals_update.exercise_goal <= 0:
-        raise HTTPException(status_code=400, detail="Exercise goal must be greater than 0")
-
-    if goals_update.water_goal_ml <= 0:
-        raise HTTPException(status_code=400, detail="Water goal must be greater than 0")
-
-    users_collection.update_one(
-        {"_id": current_user["_id"]},
-        {
-            "$set": {
-                "calorie_goal": goals_update.calorie_goal,
-                "exercise_goal": goals_update.exercise_goal,
-                "water_goal_ml": goals_update.water_goal_ml
-            }
-        }
-    )
-
-    updated_user = users_collection.find_one({"_id": current_user["_id"]})
-
-    logger.info(
-        "User goals updated: user_id=%s calorie_goal=%s exercise_goal=%s water_goal_ml=%s",
-        str(current_user["_id"]),
-        goals_update.calorie_goal,
-        goals_update.exercise_goal,
-        goals_update.water_goal_ml
-    )
-
-    return serialize_goals(updated_user)
 
 
 # ---------- Admin routes ----------
