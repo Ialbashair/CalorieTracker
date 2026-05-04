@@ -42,6 +42,65 @@
             <p id="admin-empty" class="empty-label">No users found.</p>
             <ul id="admin-user-list"></ul>
         </section>
+
+        <section class="section">
+            <div class="section-header">
+                <div>
+                    <h2>Database Management</h2>
+                    <p class="section-subtext">Add foods and exercises users can track.</p>
+                </div>
+            </div>
+
+            <div class="admin-management-grid">
+                <div class="settings-card">
+                    <h3>Add Food</h3>
+
+                    <input
+                        type="text"
+                        id="admin-food-name"
+                        placeholder="Food name, e.g. banana"
+                    >
+
+                    <input
+                        type="number"
+                        id="admin-food-calories"
+                        placeholder="Calories"
+                        min="1"
+                    >
+
+                    <input
+                        type="number"
+                        id="admin-food-serving-size-g"
+                        placeholder="Serving size in grams"
+                        min="1"
+                        value="100"
+                    >
+
+                    <button class="save-btn" onclick="adminAddFood()">Add Food</button>
+                    <p id="admin-food-message" class="auth-message"></p>
+                </div>
+
+                <div class="settings-card">
+                    <h3>Add Exercise</h3>
+
+                    <input
+                        type="text"
+                        id="admin-exercise-name"
+                        placeholder="Exercise name, e.g. Jump Rope"
+                    >
+
+                    <input
+                        type="number"
+                        id="admin-exercise-calories"
+                        placeholder="Calories burned per hour"
+                        min="1"
+                    >
+
+                    <button class="save-btn" onclick="adminAddExercise()">Add Exercise</button>
+                    <p id="admin-exercise-message" class="auth-message"></p>
+                </div>
+            </div>
+        </section>
     </div>
 </body>
 </html>

@@ -3,8 +3,6 @@ console.log("SCRIPT.JS LOADED");
 const REGISTER_URL = "/register";
 const LOGIN_URL = "/login";
 
-// TEST
-
 
 // ---------- Feed state ----------
 let feedOffset = 0;
@@ -482,6 +480,169 @@ async function setupCaloriePage() {
     loadFoodLogs();
     loadExerciseLogs();
     loadWaterLogs();
+}
+
+function getPreviousTrackerDateString() {
+    const previousDate = new Date(trackerSelectedDate);
+    previousDate.setDate(previousDate.getDate() - 1);
+    return formatTrackerDateForApi(previousDate);
+}
+
+function getCurrentTrackerDateString() {
+    return formatTrackerDateForApi(trackerSelectedDate);
+}
+
+async function copyPreviousFoodLogs() {
+    const previousDate = getPreviousTrackerDateString();
+    const currentDate = getCurrentTrackerDateString();
+
+    const confirmed = confirm(`Copy all food logs from ${previousDate} to ${currentDate}?`);
+    if (!confirmed) return;
+
+    try {
+        const response = await fetch(`/food-logs?date=${previousDate}`, {
+            headers: getAuthHeaders(false)
+        });
+
+        if (response.status === 401) {
+            logoutUser();
+            return;
+        }
+
+        const previousLogs = await response.json();
+
+        if (!previousLogs.length) {
+            alert("No food logs found for the previous day.");
+            return;
+        }
+
+        for (const log of previousLogs) {
+            const copyResponse = await fetch("/food-logs", {
+                method: "POST",
+                headers: getAuthHeaders(),
+                body: JSON.stringify({
+                    food_name: log.food_name,
+                    calories: log.calories,
+                    amount: log.amount,
+                    unit: log.unit || "g",
+                    meal: log.meal || "snack",
+                    log_date: currentDate
+                })
+            });
+
+            if (!copyResponse.ok) {
+                const data = await copyResponse.json().catch(() => ({}));
+                alert(data.detail || "Failed to copy one or more food logs.");
+                return;
+            }
+        }
+
+        await loadFoodLogs();
+        alert("Food logs copied successfully.");
+    } catch (error) {
+        console.error("Error copying food logs:", error);
+        alert("Something went wrong while copying food logs.");
+    }
+}
+
+async function copyPreviousExerciseLogs() {
+    const previousDate = getPreviousTrackerDateString();
+    const currentDate = getCurrentTrackerDateString();
+
+    const confirmed = confirm(`Copy all exercise logs from ${previousDate} to ${currentDate}?`);
+    if (!confirmed) return;
+
+    try {
+        const response = await fetch(`/exercise-logs?date=${previousDate}`, {
+            headers: getAuthHeaders(false)
+        });
+
+        if (response.status === 401) {
+            logoutUser();
+            return;
+        }
+
+        const previousLogs = await response.json();
+
+        if (!previousLogs.length) {
+            alert("No exercise logs found for the previous day.");
+            return;
+        }
+
+        for (const log of previousLogs) {
+            const copyResponse = await fetch("/exercise-logs", {
+                method: "POST",
+                headers: getAuthHeaders(),
+                body: JSON.stringify({
+                    exercise_name: log.exercise_name,
+                    calories_burned: log.calories_burned,
+                    hours: log.hours,
+                    log_date: currentDate
+                })
+            });
+
+            if (!copyResponse.ok) {
+                const data = await copyResponse.json().catch(() => ({}));
+                alert(data.detail || "Failed to copy one or more exercise logs.");
+                return;
+            }
+        }
+
+        await loadExerciseLogs();
+        alert("Exercise logs copied successfully.");
+    } catch (error) {
+        console.error("Error copying exercise logs:", error);
+        alert("Something went wrong while copying exercise logs.");
+    }
+}
+
+async function copyPreviousWaterLogs() {
+    const previousDate = getPreviousTrackerDateString();
+    const currentDate = getCurrentTrackerDateString();
+
+    const confirmed = confirm(`Copy all water logs from ${previousDate} to ${currentDate}?`);
+    if (!confirmed) return;
+
+    try {
+        const response = await fetch(`/water-logs?date=${previousDate}`, {
+            headers: getAuthHeaders(false)
+        });
+
+        if (response.status === 401) {
+            logoutUser();
+            return;
+        }
+
+        const previousLogs = await response.json();
+
+        if (!previousLogs.length) {
+            alert("No water logs found for the previous day.");
+            return;
+        }
+
+        for (const log of previousLogs) {
+            const copyResponse = await fetch("/water-logs", {
+                method: "POST",
+                headers: getAuthHeaders(),
+                body: JSON.stringify({
+                    amount_ml: log.amount_ml,
+                    log_date: currentDate
+                })
+            });
+
+            if (!copyResponse.ok) {
+                const data = await copyResponse.json().catch(() => ({}));
+                alert(data.detail || "Failed to copy one or more water logs.");
+                return;
+            }
+        }
+
+        await loadWaterLogs();
+        alert("Water logs copied successfully.");
+    } catch (error) {
+        console.error("Error copying water logs:", error);
+        alert("Something went wrong while copying water logs.");
+    }
 }
 
 // ---------- Food section ----------
@@ -2056,6 +2217,120 @@ async function deleteAdminUser(userId) {
     } catch (error) {
         console.error("Error deleting user:", error);
         alert("Something went wrong.");
+    }
+}
+
+async function adminAddFood() {
+    const nameInput = document.getElementById("admin-food-name");
+    const caloriesInput = document.getElementById("admin-food-calories");
+    const servingSizeInput = document.getElementById("admin-food-serving-size-g");
+    const messageEl = document.getElementById("admin-food-message");
+
+    if (!nameInput || !caloriesInput || !servingSizeInput || !messageEl) return;
+
+    const name = nameInput.value.trim();
+    const calories = parseInt(caloriesInput.value, 10);
+    const serving_size_g = parseFloat(servingSizeInput.value);
+
+    if (!name || isNaN(calories) || calories <= 0 || isNaN(serving_size_g) || serving_size_g <= 0) {
+        messageEl.textContent = "Please enter a valid food name, calories, and serving size.";
+        messageEl.style.color = "red";
+        return;
+    }
+
+    try {
+        const response = await fetch("/admin/foods", {
+            method: "POST",
+            headers: getAuthHeaders(),
+            body: JSON.stringify({
+                name,
+                calories,
+                serving_size_g
+            })
+        });
+
+        if (response.status === 401) {
+            logoutUser();
+            return;
+        }
+
+        if (response.status === 403) {
+            window.location.href = "/tracker";
+            return;
+        }
+
+        const data = await response.json().catch(() => ({}));
+
+        if (response.ok) {
+            messageEl.textContent = data.message || "Food added successfully.";
+            messageEl.style.color = "green";
+
+            nameInput.value = "";
+            caloriesInput.value = "";
+            servingSizeInput.value = "100";
+        } else {
+            messageEl.textContent = data.detail || "Failed to add food.";
+            messageEl.style.color = "red";
+        }
+    } catch (error) {
+        console.error("Error adding food:", error);
+        messageEl.textContent = "Something went wrong.";
+        messageEl.style.color = "red";
+    }
+}
+
+async function adminAddExercise() {
+    const nameInput = document.getElementById("admin-exercise-name");
+    const caloriesInput = document.getElementById("admin-exercise-calories");
+    const messageEl = document.getElementById("admin-exercise-message");
+
+    if (!nameInput || !caloriesInput || !messageEl) return;
+
+    const name = nameInput.value.trim();
+    const calories_per_hour = parseInt(caloriesInput.value, 10);
+
+    if (!name || isNaN(calories_per_hour) || calories_per_hour <= 0) {
+        messageEl.textContent = "Please enter a valid exercise name and calories per hour.";
+        messageEl.style.color = "red";
+        return;
+    }
+
+    try {
+        const response = await fetch("/admin/exercises", {
+            method: "POST",
+            headers: getAuthHeaders(),
+            body: JSON.stringify({
+                name,
+                calories_per_hour
+            })
+        });
+
+        if (response.status === 401) {
+            logoutUser();
+            return;
+        }
+
+        if (response.status === 403) {
+            window.location.href = "/tracker";
+            return;
+        }
+
+        const data = await response.json().catch(() => ({}));
+
+        if (response.ok) {
+            messageEl.textContent = data.message || "Exercise added successfully.";
+            messageEl.style.color = "green";
+
+            nameInput.value = "";
+            caloriesInput.value = "";
+        } else {
+            messageEl.textContent = data.detail || "Failed to add exercise.";
+            messageEl.style.color = "red";
+        }
+    } catch (error) {
+        console.error("Error adding exercise:", error);
+        messageEl.textContent = "Something went wrong.";
+        messageEl.style.color = "red";
     }
 }
 

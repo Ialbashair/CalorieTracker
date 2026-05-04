@@ -301,6 +301,16 @@ class WeeklyRecapOut(BaseModel):
     days_logged: int
     daily: List[WeeklyRecapDay]
 
+class FoodCreate(BaseModel):
+    name: str
+    calories: int
+    serving_size_g: float = 100
+
+
+class ExerciseCreate(BaseModel):
+    name: str
+    calories_per_hour: int
+
 # ---------- Helper functions ----------
 def serialize_user(user) -> dict:
     return {
@@ -1260,6 +1270,135 @@ def update_user_role(user_id: str, role_update: UserRoleUpdate, current_user=Dep
     )
 
     return serialize_user(updated_user)
+
+@app.post("/admin/foods", status_code=status.HTTP_201_CREATED)
+def admin_add_food(
+    food: FoodCreate,
+    current_user=Depends(require_admin)
+):
+    name = food.name.strip().lower()
+
+    if not name:
+        raise HTTPException(status_code=400, detail="Food name cannot be empty")
+
+    if food.calories <= 0:
+        raise HTTPException(status_code=400, detail="Calories must be greater than 0")
+
+    if food.serving_size_g <= 0:
+        raise HTTPException(status_code=400, detail="Serving size must be greater than 0")
+
+    existing_food = foods_collection.find_one({
+        "name": {"$regex": f"^{name}$", "$options": "i"}
+    })
+
+    if existing_food:
+        raise HTTPException(status_code=400, detail="Food already exists")
+
+    food_dict = {
+        "name": name,
+        "calories": food.calories,
+        "serving_size_g": food.serving_size_g,
+
+        # Extra nutrition fields kept for database consistency
+        "fat_total_g": 0,
+        "fat_saturated_g": 0,
+        "protein_g": 0,
+        "sodium_mg": 0,
+        "potassium_mg": 0,
+        "cholesterol_mg": 0,
+        "carbohydrates_total_g": 0,
+        "fiber_g": 0,
+        "sugar_g": 0,
+
+        # Metadata showing this was manually added by an admin
+        "source": "admin_app",
+        "created_by_admin": True,
+        "created_by_admin_id": str(current_user["_id"]),
+        "created_by_admin_username": current_user.get("username"),
+        "_fetchedAt": datetime.now(timezone.utc)
+    }
+
+    result = foods_collection.insert_one(food_dict)
+    new_food = foods_collection.find_one({"_id": result.inserted_id})
+
+    logger.info(
+        "Admin added food: admin_user_id=%s food_id=%s name=%s calories=%s serving_size_g=%s",
+        str(current_user["_id"]),
+        str(new_food["_id"]),
+        name,
+        food.calories,
+        food.serving_size_g
+    )
+
+    return {
+        "message": "Food added successfully",
+        "food": {
+            "id": str(new_food["_id"]),
+            "name": new_food["name"],
+            "calories": new_food["calories"],
+            "serving_size_g": new_food["serving_size_g"],
+            "source": new_food["source"],
+            "created_by_admin": new_food["created_by_admin"],
+            "created_by_admin_username": new_food.get("created_by_admin_username"),
+            "_fetchedAt": new_food["_fetchedAt"].isoformat()
+        }
+    }
+
+@app.post("/admin/exercises", status_code=status.HTTP_201_CREATED)
+def admin_add_exercise(
+    exercise: ExerciseCreate,
+    current_user=Depends(require_admin)
+):
+    name = exercise.name.strip()
+
+    if not name:
+        raise HTTPException(status_code=400, detail="Exercise name cannot be empty")
+
+    if exercise.calories_per_hour <= 0:
+        raise HTTPException(status_code=400, detail="Calories per hour must be greater than 0")
+
+    existing_exercise = exercises_collection.find_one({
+        "name": {"$regex": f"^{name}$", "$options": "i"}
+    })
+
+    if existing_exercise:
+        raise HTTPException(status_code=400, detail="Exercise already exists")
+
+    exercise_dict = {
+        "name": name,
+        "calories_per_hour": exercise.calories_per_hour,
+
+        # Metadata showing this was manually added by an admin
+        "source": "admin_app",
+        "created_by_admin": True,
+        "created_by_admin_id": str(current_user["_id"]),
+        "created_by_admin_username": current_user.get("username"),
+        "_fetchedAt": datetime.now(timezone.utc)
+    }
+
+    result = exercises_collection.insert_one(exercise_dict)
+    new_exercise = exercises_collection.find_one({"_id": result.inserted_id})
+
+    logger.info(
+        "Admin added exercise: admin_user_id=%s exercise_id=%s name=%s calories_per_hour=%s",
+        str(current_user["_id"]),
+        str(new_exercise["_id"]),
+        name,
+        exercise.calories_per_hour
+    )
+
+    return {
+        "message": "Exercise added successfully",
+        "exercise": {
+            "id": str(new_exercise["_id"]),
+            "name": new_exercise["name"],
+            "calories_per_hour": new_exercise["calories_per_hour"],
+            "source": new_exercise["source"],
+            "created_by_admin": new_exercise["created_by_admin"],
+            "created_by_admin_username": new_exercise.get("created_by_admin_username"),
+            "_fetchedAt": new_exercise["_fetchedAt"].isoformat()
+        }
+    }
 
 # ---------- Home routes ----------
 @app.get("/home/today-stats", response_model=HomeTodayStats)
