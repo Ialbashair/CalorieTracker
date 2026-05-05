@@ -433,22 +433,38 @@ async function renderPlot(graphContainer=null) {
     let fi = 0;
     let ei = 0;
     let total = 0;
+    let totalGained = 0;
+    let totalBurned = 0;
     while (fi < food.length || ei < exercise.length) {
         let ft = (fi < food.length)     ? Date.parse(food[fi].created_at)     : new Date(8640000000000000).getTime();
         let et = (ei < exercise.length) ? Date.parse(exercise[ei].created_at) : new Date(8640000000000000).getTime();
 
         if (ft < et) {
             total += food[fi].calories;
+
+            totalGained += food[fi].calories;
+            food[fi].calories = totalGained;
+
             total_timestamps.push(food[fi].created_at);
             fi += 1;
         }
         else if (et < ft) {
             total -= exercise[ei].calories_burned;
+
+            totalBurned += exercise[ei].calories_burned;
+            exercise[ei].calories_burned = totalBurned;
+
             total_timestamps.push(exercise[ei].created_at);
             ei += 1;
         }
         else if (ft === et) {
             total += food[fi].calories - exercise[ei].calories_burned;
+
+            totalGained += food[fi].calories;
+            food[fi].calories = totalGained;
+            totalBurned += exercise[ei].calories_burned;
+            exercise[ei].calories_burned = totalBurned;
+
             total_timestamps.push(food[fi].created_at);
             ft += 1;
             ei += 1;
@@ -525,30 +541,30 @@ async function sharePlot() {
 
     const recapImageDataUrl = await Plotly.toImage(graphContainer);
 
-    console.dir(graphContainer.calcdata);
     function getTotal(arrIndex) {
-        let arr = graphContainer.calcdata[arrIndex].y;
+        let arr = graphContainer.calcdata[arrIndex][0].y;
 
         if (arr === undefined) {
             return 0;
         }
+        else if (typeof arr === 'number') {
+            return arr;
+        }
         else {
-            
+            return arr[arr.length - 1];
         }
     }
 
-    let totalGained = graphContainer.calcdata[0]; totalGained = totalGained[totalGained.length];
-    let totalBurned = graphContainer.calcdata[1]; totalBurned = totalBurned[totalBurned.length];
-    let totalTotal  = graphContainer.calcdata[2]; totalTotal  = totalTotal[totalTotal.length];
+    let totalGained = getTotal(0);
+    let totalBurned = getTotal(1);
+    // let totalTotal  = getTotal(2);
 
-    const recapCaption = `My Nutri weekly recap: ${totalGained} calories consumed, ${totalBurned} burned, ${totalTotal}/7 days logged.`;
+    const recapCaption = `My Nutri ${formatTrackerDateForApi(trackerSelectedDate)} recap: ${totalGained} calories gained, ${totalBurned} burned`;
 
-    console.log(recapImageDataUrl, recapCaption);
+    sessionStorage.setItem("pendingRecapImage", recapImageDataUrl);
+    sessionStorage.setItem("pendingRecapCaption", recapCaption);
 
-    // sessionStorage.setItem("pendingRecapImage", recapImageDataUrl);
-    // sessionStorage.setItem("pendingRecapCaption", recapCaption);
-
-    // window.location.href = "/feed/create";
+    window.location.href = "/feed/create";
 }
 
 // ---------- Food section ----------
