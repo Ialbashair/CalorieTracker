@@ -3,6 +3,7 @@ console.log("SCRIPT.JS LOADED");
 const REGISTER_URL = "/register";
 const LOGIN_URL = "/login";
 
+
 // ---------- Feed state ----------
 let feedOffset = 0;
 let feedLimit = 10;
@@ -253,18 +254,76 @@ async function setupHomePage() {
         userSinceEl.textContent = "User Since --";
     }
 
-    await loadHomeTodayStats();
+    await loadUserGoals();
+    await loadHomeDailyTotals();
 }
 
-async function loadHomeTodayStats() {
-    const consumedEl = document.getElementById("home-calories-consumed");
-    const burnedEl = document.getElementById("home-calories-burned");
-    const netEl = document.getElementById("home-net-calories");
-
-    if (!consumedEl || !burnedEl || !netEl) return;
-
+async function loadHomeDailyTotals() {
     try {
-        const response = await fetch("/home/today-stats", {
+        const today = formatTrackerDateForApi(startOfLocalDay(new Date()));
+
+        const foodResponse = await fetch(`/food-logs?date=${today}`, {
+            headers: getAuthHeaders(false)
+        });
+
+        const exerciseResponse = await fetch(`/exercise-logs?date=${today}`, {
+            headers: getAuthHeaders(false)
+        });
+
+        const waterResponse = await fetch(`/water-logs?date=${today}`, {
+            headers: getAuthHeaders(false)
+        });
+
+        if (
+            foodResponse.status === 401 ||
+            exerciseResponse.status === 401 ||
+            waterResponse.status === 401
+        ) {
+            logoutUser();
+            return;
+        }
+
+        const foodLogs = await foodResponse.json();
+        const exerciseLogs = await exerciseResponse.json();
+        const waterLogs = await waterResponse.json();
+
+        homeCaloriesConsumedToday = foodLogs.reduce((sum, log) => {
+            return sum + (Number(log.calories) || 0);
+        }, 0);
+
+        homeCaloriesBurnedToday = exerciseLogs.reduce((sum, log) => {
+            return sum + (Number(log.calories_burned) || 0);
+        }, 0);
+
+        homeWaterTotalToday = waterLogs.reduce((sum, log) => {
+            return sum + (Number(log.amount_ml) || 0);
+        }, 0);
+
+        const consumedEl = document.getElementById("home-calories-consumed");
+        const burnedEl = document.getElementById("home-calories-burned");
+        const netEl = document.getElementById("home-net-calories");
+
+        if (consumedEl) consumedEl.textContent = homeCaloriesConsumedToday;
+        if (burnedEl) burnedEl.textContent = homeCaloriesBurnedToday;
+        if (netEl) netEl.textContent = homeCaloriesConsumedToday - homeCaloriesBurnedToday;
+
+        updateHomeGoalProgress();
+    } catch (error) {
+        console.error("Error loading home daily totals:", error);
+
+        homeCaloriesConsumedToday = 0;
+        homeCaloriesBurnedToday = 0;
+        homeWaterTotalToday = 0;
+
+        updateHomeGoalProgress();
+    }
+}
+
+async function loadHomeWaterTotal() {
+    try {
+        const today = formatTrackerDateForApi(startOfLocalDay(new Date()));
+
+        const response = await fetch(`/water-logs?date=${today}`, {
             headers: getAuthHeaders(false)
         });
 
@@ -273,18 +332,46 @@ async function loadHomeTodayStats() {
             return;
         }
 
-        const data = await response.json();
+        const logs = await response.json();
 
-        consumedEl.textContent = data.calories_consumed_today ?? 0;
-        burnedEl.textContent = data.calories_burned_today ?? 0;
-        netEl.textContent = data.net_calories_today ?? 0;
+        homeWaterTotalToday = logs.reduce((sum, log) => {
+            return sum + (Number(log.amount_ml) || 0);
+        }, 0);
+
+        updateHomeGoalProgress();
     } catch (error) {
-        console.error("Error loading home today stats:", error);
-        consumedEl.textContent = "0";
-        burnedEl.textContent = "0";
-        netEl.textContent = "0";
+        console.error("Error loading home water total:", error);
+        homeWaterTotalToday = 0;
+        updateHomeGoalProgress();
     }
 }
+
+function updateHomeGoalProgress() {
+    updateGoalProgress(
+        "home-food-goal-label",
+        "home-food-goal-fill",
+        homeCaloriesConsumedToday,
+        userGoals.calorie_goal,
+        "kcal"
+    );
+
+    updateGoalProgress(
+        "home-exercise-goal-label",
+        "home-exercise-goal-fill",
+        homeCaloriesBurnedToday,
+        userGoals.exercise_goal,
+        "kcal burned"
+    );
+
+    updateGoalProgress(
+        "home-water-goal-label",
+        "home-water-goal-fill",
+        homeWaterTotalToday,
+        userGoals.water_goal_ml,
+        "mL"
+    );
+}
+
 
 // ---------- Tracker page ----------
 let trackerSelectedDate = startOfLocalDay(new Date());
@@ -334,8 +421,15 @@ function changeTrackerDate(deltaDays) {
 function setTrackerSelectedDate(date) {
     trackerSelectedDate = startOfLocalDay(date);
 
+    foodCaloriesTotal = 0;
+    exerciseCaloriesTotal = 0;
+    updateCalorieTotals();
+
     renderTrackerDateLabel();
     syncTrackerDateInput();
+    loadFoodLogs();
+    loadExerciseLogs();
+    loadWaterLogs();
 }
 
 function syncTrackerDateInput() {
@@ -361,6 +455,7 @@ function onTrackerDatePicked(value) {
     if (!y || !m || !d) return;
     setTrackerSelectedDate(new Date(y, m - 1, d));
 }
+
 async function setupCaloriePage() {
     const calorieList = document.getElementById("calorie-list");
     const totalDisplay = document.getElementById("total-calories");
@@ -383,8 +478,11 @@ async function setupCaloriePage() {
     trackerSelectedDate = startOfLocalDay(new Date());
     renderTrackerDateLabel();
     syncTrackerDateInput();
-    
-    updateCaloriePage();
+
+    await loadUserGoals();
+    loadFoodLogs();
+    loadExerciseLogs();
+    loadWaterLogs();
 }
 
 function updateCaloriePage() {
@@ -394,6 +492,169 @@ function updateCaloriePage() {
     loadFoodLogs();
     loadExerciseLogs();
     loadWaterLogs();
+}
+
+function getPreviousTrackerDateString() {
+    const previousDate = new Date(trackerSelectedDate);
+    previousDate.setDate(previousDate.getDate() - 1);
+    return formatTrackerDateForApi(previousDate);
+}
+
+function getCurrentTrackerDateString() {
+    return formatTrackerDateForApi(trackerSelectedDate);
+}
+
+async function copyPreviousFoodLogs() {
+    const previousDate = getPreviousTrackerDateString();
+    const currentDate = getCurrentTrackerDateString();
+
+    const confirmed = confirm(`Copy all food logs from ${previousDate} to ${currentDate}?`);
+    if (!confirmed) return;
+
+    try {
+        const response = await fetch(`/food-logs?date=${previousDate}`, {
+            headers: getAuthHeaders(false)
+        });
+
+        if (response.status === 401) {
+            logoutUser();
+            return;
+        }
+
+        const previousLogs = await response.json();
+
+        if (!previousLogs.length) {
+            alert("No food logs found for the previous day.");
+            return;
+        }
+
+        for (const log of previousLogs) {
+            const copyResponse = await fetch("/food-logs", {
+                method: "POST",
+                headers: getAuthHeaders(),
+                body: JSON.stringify({
+                    food_name: log.food_name,
+                    calories: log.calories,
+                    amount: log.amount,
+                    unit: log.unit || "g",
+                    meal: log.meal || "snack",
+                    log_date: currentDate
+                })
+            });
+
+            if (!copyResponse.ok) {
+                const data = await copyResponse.json().catch(() => ({}));
+                alert(data.detail || "Failed to copy one or more food logs.");
+                return;
+            }
+        }
+
+        await loadFoodLogs();
+        alert("Food logs copied successfully.");
+    } catch (error) {
+        console.error("Error copying food logs:", error);
+        alert("Something went wrong while copying food logs.");
+    }
+}
+
+async function copyPreviousExerciseLogs() {
+    const previousDate = getPreviousTrackerDateString();
+    const currentDate = getCurrentTrackerDateString();
+
+    const confirmed = confirm(`Copy all exercise logs from ${previousDate} to ${currentDate}?`);
+    if (!confirmed) return;
+
+    try {
+        const response = await fetch(`/exercise-logs?date=${previousDate}`, {
+            headers: getAuthHeaders(false)
+        });
+
+        if (response.status === 401) {
+            logoutUser();
+            return;
+        }
+
+        const previousLogs = await response.json();
+
+        if (!previousLogs.length) {
+            alert("No exercise logs found for the previous day.");
+            return;
+        }
+
+        for (const log of previousLogs) {
+            const copyResponse = await fetch("/exercise-logs", {
+                method: "POST",
+                headers: getAuthHeaders(),
+                body: JSON.stringify({
+                    exercise_name: log.exercise_name,
+                    calories_burned: log.calories_burned,
+                    hours: log.hours,
+                    log_date: currentDate
+                })
+            });
+
+            if (!copyResponse.ok) {
+                const data = await copyResponse.json().catch(() => ({}));
+                alert(data.detail || "Failed to copy one or more exercise logs.");
+                return;
+            }
+        }
+
+        await loadExerciseLogs();
+        alert("Exercise logs copied successfully.");
+    } catch (error) {
+        console.error("Error copying exercise logs:", error);
+        alert("Something went wrong while copying exercise logs.");
+    }
+}
+
+async function copyPreviousWaterLogs() {
+    const previousDate = getPreviousTrackerDateString();
+    const currentDate = getCurrentTrackerDateString();
+
+    const confirmed = confirm(`Copy all water logs from ${previousDate} to ${currentDate}?`);
+    if (!confirmed) return;
+
+    try {
+        const response = await fetch(`/water-logs?date=${previousDate}`, {
+            headers: getAuthHeaders(false)
+        });
+
+        if (response.status === 401) {
+            logoutUser();
+            return;
+        }
+
+        const previousLogs = await response.json();
+
+        if (!previousLogs.length) {
+            alert("No water logs found for the previous day.");
+            return;
+        }
+
+        for (const log of previousLogs) {
+            const copyResponse = await fetch("/water-logs", {
+                method: "POST",
+                headers: getAuthHeaders(),
+                body: JSON.stringify({
+                    amount_ml: log.amount_ml,
+                    log_date: currentDate
+                })
+            });
+
+            if (!copyResponse.ok) {
+                const data = await copyResponse.json().catch(() => ({}));
+                alert(data.detail || "Failed to copy one or more water logs.");
+                return;
+            }
+        }
+
+        await loadWaterLogs();
+        alert("Water logs copied successfully.");
+    } catch (error) {
+        console.error("Error copying water logs:", error);
+        alert("Something went wrong while copying water logs.");
+    }
 }
 
 // ---------- Stats page ----------
@@ -623,6 +884,17 @@ let foodList = [];
 let selectedFood = null;
 let foodCaloriesTotal = 0;
 let exerciseCaloriesTotal = 0;
+let waterTotal = 0;
+
+let userGoals = {
+    calorie_goal: 2000,
+    exercise_goal: 500,
+    water_goal_ml: 2000
+};
+
+let homeCaloriesConsumedToday = 0;
+let homeCaloriesBurnedToday = 0;
+let homeWaterTotalToday = 0;
 
 function updateCalorieTotals() {
     const inEl = document.getElementById("calories-in");
@@ -636,6 +908,83 @@ function updateCalorieTotals() {
     if (inEl) inEl.textContent = caloriesIn;
     if (outEl) outEl.textContent = caloriesOut;
     if (totalEl) totalEl.textContent = netCalories;
+}
+
+async function loadUserGoals() {
+    try {
+        const response = await fetch("/settings/goals", {
+            headers: getAuthHeaders(false)
+        });
+
+        if (response.status === 401) {
+            logoutUser();
+            return;
+        }
+
+        if (response.ok) {
+            userGoals = await response.json();
+            updateAllGoalProgress();
+            populateGoalSettingsInputs();
+        }
+    } catch (error) {
+        console.error("Error loading user goals:", error);
+    }
+}
+
+function updateAllGoalProgress() {
+    updateGoalProgress(
+        "food-goal-label",
+        "food-goal-fill",
+        foodCaloriesTotal,
+        userGoals.calorie_goal,
+        "kcal"
+    );
+
+    updateGoalProgress(
+        "exercise-goal-label",
+        "exercise-goal-fill",
+        exerciseCaloriesTotal,
+        userGoals.exercise_goal,
+        "kcal burned"
+    );
+
+    updateGoalProgress(
+        "water-goal-label",
+        "water-goal-fill",
+        waterTotal,
+        userGoals.water_goal_ml,
+        "mL"
+    );
+}
+
+function updateGoalProgress(labelId, fillId, current, goal, unit) {
+    const label = document.getElementById(labelId);
+    const fill = document.getElementById(fillId);
+
+    if (!label || !fill) return;
+
+    const safeCurrent = Number(current) || 0;
+    const safeGoal = Number(goal) || 1;
+    const percent = Math.min((safeCurrent / safeGoal) * 100, 100);
+
+    label.textContent = `${safeCurrent} / ${safeGoal} ${unit}`;
+    fill.style.width = `${percent}%`;
+
+    if (safeCurrent >= safeGoal) {
+        fill.classList.add("goal-complete");
+    } else {
+        fill.classList.remove("goal-complete");
+    }
+}
+
+function populateGoalSettingsInputs() {
+    const calorieInput = document.getElementById("settings-calorie-goal");
+    const exerciseInput = document.getElementById("settings-exercise-goal");
+    const waterInput = document.getElementById("settings-water-goal");
+
+    if (calorieInput) calorieInput.value = userGoals.calorie_goal;
+    if (exerciseInput) exerciseInput.value = userGoals.exercise_goal;
+    if (waterInput) waterInput.value = userGoals.water_goal_ml;
 }
 
 async function loadFoodLogs() {
@@ -2065,6 +2414,120 @@ async function deleteAdminUser(userId) {
     }
 }
 
+async function adminAddFood() {
+    const nameInput = document.getElementById("admin-food-name");
+    const caloriesInput = document.getElementById("admin-food-calories");
+    const servingSizeInput = document.getElementById("admin-food-serving-size-g");
+    const messageEl = document.getElementById("admin-food-message");
+
+    if (!nameInput || !caloriesInput || !servingSizeInput || !messageEl) return;
+
+    const name = nameInput.value.trim();
+    const calories = parseInt(caloriesInput.value, 10);
+    const serving_size_g = parseFloat(servingSizeInput.value);
+
+    if (!name || isNaN(calories) || calories <= 0 || isNaN(serving_size_g) || serving_size_g <= 0) {
+        messageEl.textContent = "Please enter a valid food name, calories, and serving size.";
+        messageEl.style.color = "red";
+        return;
+    }
+
+    try {
+        const response = await fetch("/admin/foods", {
+            method: "POST",
+            headers: getAuthHeaders(),
+            body: JSON.stringify({
+                name,
+                calories,
+                serving_size_g
+            })
+        });
+
+        if (response.status === 401) {
+            logoutUser();
+            return;
+        }
+
+        if (response.status === 403) {
+            window.location.href = "/tracker";
+            return;
+        }
+
+        const data = await response.json().catch(() => ({}));
+
+        if (response.ok) {
+            messageEl.textContent = data.message || "Food added successfully.";
+            messageEl.style.color = "green";
+
+            nameInput.value = "";
+            caloriesInput.value = "";
+            servingSizeInput.value = "100";
+        } else {
+            messageEl.textContent = data.detail || "Failed to add food.";
+            messageEl.style.color = "red";
+        }
+    } catch (error) {
+        console.error("Error adding food:", error);
+        messageEl.textContent = "Something went wrong.";
+        messageEl.style.color = "red";
+    }
+}
+
+async function adminAddExercise() {
+    const nameInput = document.getElementById("admin-exercise-name");
+    const caloriesInput = document.getElementById("admin-exercise-calories");
+    const messageEl = document.getElementById("admin-exercise-message");
+
+    if (!nameInput || !caloriesInput || !messageEl) return;
+
+    const name = nameInput.value.trim();
+    const calories_per_hour = parseInt(caloriesInput.value, 10);
+
+    if (!name || isNaN(calories_per_hour) || calories_per_hour <= 0) {
+        messageEl.textContent = "Please enter a valid exercise name and calories per hour.";
+        messageEl.style.color = "red";
+        return;
+    }
+
+    try {
+        const response = await fetch("/admin/exercises", {
+            method: "POST",
+            headers: getAuthHeaders(),
+            body: JSON.stringify({
+                name,
+                calories_per_hour
+            })
+        });
+
+        if (response.status === 401) {
+            logoutUser();
+            return;
+        }
+
+        if (response.status === 403) {
+            window.location.href = "/tracker";
+            return;
+        }
+
+        const data = await response.json().catch(() => ({}));
+
+        if (response.ok) {
+            messageEl.textContent = data.message || "Exercise added successfully.";
+            messageEl.style.color = "green";
+
+            nameInput.value = "";
+            caloriesInput.value = "";
+        } else {
+            messageEl.textContent = data.detail || "Failed to add exercise.";
+            messageEl.style.color = "red";
+        }
+    } catch (error) {
+        console.error("Error adding exercise:", error);
+        messageEl.textContent = "Something went wrong.";
+        messageEl.style.color = "red";
+    }
+}
+
 // ---------- Social Feed ----------
 async function setupFeedPage() {
     const feedContainer = document.getElementById("feed-posts");
@@ -3040,6 +3503,8 @@ async function setupSettingsPage() {
         themeSelect.value = localStorage.getItem("nutriTheme") || "light";
     }
     populateProfilePicturePreview(currentUser);
+
+    await loadUserGoals();
 }
 
 async function submitUsernameChange() {

@@ -940,6 +940,62 @@ button:active {
     border: 1px solid var(--border);
 }
 
+/* ---------- Goal progress bars ---------- */
+.home-goals-card {
+    margin-top: 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+.goal-progress {
+    background: #ffffff;
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 14px 16px;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.04);
+}
+
+.goal-progress-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 10px;
+    font-size: 0.92rem;
+    font-weight: 700;
+    color: var(--text);
+}
+
+.goal-progress-row span:first-child {
+    color: #4b5563;
+}
+
+.goal-progress-row span:last-child {
+    color: var(--text);
+    white-space: nowrap;
+}
+
+.goal-progress-bar {
+    width: 100%;
+    height: 12px;
+    background: #e5e7eb;
+    border-radius: 999px;
+    overflow: hidden;
+}
+
+.goal-progress-fill {
+    height: 100%;
+    width: 0%;
+    background: var(--primary);
+    border-radius: 999px;
+    transition: width 0.25s ease;
+}
+
+.goal-progress-fill.goal-complete {
+    background: #16a34a;
+}
+
 /* ---------- Dark mode ---------- */
 body.dark-mode {
     --bg: #111827;
@@ -1038,6 +1094,22 @@ body.dark-mode .weekly-recap-card {
     background: var(--card);
     color: var(--text);
     border-color: var(--border);
+}
+
+/* ---------- Goal progress dark mode ---------- */
+body.dark-mode .goal-progress {
+    background: var(--card);
+    color: var(--text);
+    border-color: var(--border);
+}
+
+body.dark-mode .goal-progress-row span:first-child,
+body.dark-mode .goal-progress-row span:last-child {
+    color: var(--text);
+}
+
+body.dark-mode .goal-progress-bar {
+    background: #374151;
 }
 
 /* ---------- Home page ---------- */
@@ -1288,4 +1360,76 @@ body.dark-mode .user-bar button:hover {
 .auth-input-row input {
     flex: 1;
     max-width: 220px;
+}
+
+/* ---------- Copy previous day buttons ---------- */
+.section-actions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.copy-section-btn,
+.section-header button.copy-section-btn {
+    appearance: none;
+    -webkit-appearance: none;
+    background: #ffffff;
+    color: var(--primary);
+    border: 1.5px solid var(--primary);
+    padding: 8px 14px;
+    border-radius: 999px;
+    font-size: 0.85rem;
+    font-weight: 800;
+    line-height: 1;
+    font-family: inherit;
+    box-shadow: 0 2px 8px rgba(6, 194, 6, 0.12);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    white-space: nowrap;
+    min-height: 34px;
+    transition: background 0.2s ease, color 0.2s ease, transform 0.1s ease, box-shadow 0.2s ease;
+}
+
+.copy-section-btn:hover,
+.section-header button.copy-section-btn:hover {
+    background: var(--primary);
+    color: white;
+    border-color: var(--primary);
+    box-shadow: 0 4px 12px rgba(6, 194, 6, 0.25);
+    transform: translateY(-1px);
+}
+
+.copy-section-btn:active,
+.section-header button.copy-section-btn:active {
+    transform: scale(0.97);
+}
+
+body.dark-mode .copy-section-btn,
+body.dark-mode .section-header button.copy-section-btn {
+    background: #111827;
+    color: var(--primary);
+    border-color: var(--primary);
+    box-shadow: 0 2px 8px rgba(34, 197, 94, 0.14);
+}
+
+body.dark-mode .copy-section-btn:hover,
+body.dark-mode .section-header button.copy-section-btn:hover {
+    background: var(--primary);
+    color: white;
+    border-color: var(--primary);
+}
+
+.admin-management-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 18px;
+}
+
+.admin-management-grid h3 {
+    margin: 0 0 4px;
+    color: var(--text);
 }

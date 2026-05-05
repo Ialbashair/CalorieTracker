@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Nutri - Tracker</title>
     <link rel="icon" type="image/x-icon" href="/static/favicon.ico">
-    <link rel="stylesheet" href="/static/style.css">
+    <link rel="stylesheet" href="/static/style.css?v=3">
     <script src="/static/script.js" defer></script>
 </head>
 
@@ -42,7 +42,10 @@
         <section class="section">
             <div class="section-header">
                 <h2>Foods</h2>
-                <button class="add-section-btn" onclick="openAddFoodModal()">+ Add Food</button>
+                <div class="section-actions">
+                    <button class="copy-section-btn" onclick="copyPreviousFoodLogs()">↺ Copy Previous Day</button>
+                    <button class="add-section-btn" onclick="openAddFoodModal()">+ Add Food</button>
+                </div>
             </div>
             <p id="food-empty" class="empty-label">No foods logged yet. Add a food to get started!</p>
             <div id="calorie-list"></div>
@@ -51,7 +54,10 @@
         <section class="section">
             <div class="section-header">
                 <h2>Exercises</h2>
-                <button class="add-section-btn exercise-btn" onclick="openAddExerciseModal()">+ Add Exercise</button>
+                <div class="section-actions">
+                    <button class="copy-section-btn" onclick="copyPreviousExerciseLogs()">↺ Copy Previous Day</button>
+                    <button class="add-section-btn exercise-btn" onclick="openAddExerciseModal()">+ Add Exercise</button>
+                </div>
             </div>
             <p id="exercise-empty" class="empty-label">No exercises logged yet. Add an exercise to get started!</p>
             <ul id="exercise-list"></ul>
@@ -60,7 +66,10 @@
         <section class="section">
             <div class="section-header">
                 <h2>Water <span id="water-total-label" class="section-subtotal">(0 mL)</span></h2>
-                <button class="add-section-btn water-btn" onclick="openAddWaterModal()">+ Add Water</button>
+                <div class="section-actions">
+                    <button class="copy-section-btn" onclick="copyPreviousWaterLogs()">↺ Copy Previous Day</button>
+                    <button class="add-section-btn water-btn" onclick="openAddWaterModal()">+ Add Water</button>
+                </div>
             </div>
             <p id="water-empty" class="empty-label">No water logged yet. Add a drink to get started!</p>
             <ul id="water-list"></ul>
