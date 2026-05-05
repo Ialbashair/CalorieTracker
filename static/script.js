@@ -517,6 +517,34 @@ async function renderPlot(graphContainer=null) {
     new_dld_btn.onclick = () => Plotly.downloadImage(graphContainer, {filename: `nutri-daily-graph-${formatTrackerDateForApi(trackerSelectedDate)}`});
 }
 
+async function sharePlot() {
+    const graphContainer = document.getElementById("graph-container");
+
+    if (!graphContainer) {
+        return;
+    }
+
+    const recapImageDataUrl = await Plotly.toImage(graphContainer);
+
+    console.dir(graphContainer.calcdata);
+    function getTotal(arr) {
+        //
+    }
+
+    let totalGained = graphContainer.calcdata[0]; totalGained = totalGained[totalGained.length];
+    let totalBurned = graphContainer.calcdata[1]; totalBurned = totalBurned[totalBurned.length];
+    let totalTotal  = graphContainer.calcdata[2]; totalTotal  = totalTotal[totalTotal.length];
+
+    const recapCaption = `My Nutri weekly recap: ${totalGained} calories consumed, ${totalBurned} burned, ${totalTotal}/7 days logged.`;
+
+    console.log(recapImageDataUrl, recapCaption);
+
+    // sessionStorage.setItem("pendingRecapImage", recapImageDataUrl);
+    // sessionStorage.setItem("pendingRecapCaption", recapCaption);
+
+    // window.location.href = "/feed/create";
+}
+
 // ---------- Food section ----------
 const MEAL_ORDER = ["breakfast", "lunch", "dinner", "snack"];
 const MEAL_LABELS = {
