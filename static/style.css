@@ -940,6 +940,62 @@ button:active {
     border: 1px solid var(--border);
 }
 
+/* ---------- Goal progress bars ---------- */
+.home-goals-card {
+    margin-top: 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+.goal-progress {
+    background: #ffffff;
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 14px 16px;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.04);
+}
+
+.goal-progress-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 10px;
+    font-size: 0.92rem;
+    font-weight: 700;
+    color: var(--text);
+}
+
+.goal-progress-row span:first-child {
+    color: #4b5563;
+}
+
+.goal-progress-row span:last-child {
+    color: var(--text);
+    white-space: nowrap;
+}
+
+.goal-progress-bar {
+    width: 100%;
+    height: 12px;
+    background: #e5e7eb;
+    border-radius: 999px;
+    overflow: hidden;
+}
+
+.goal-progress-fill {
+    height: 100%;
+    width: 0%;
+    background: var(--primary);
+    border-radius: 999px;
+    transition: width 0.25s ease;
+}
+
+.goal-progress-fill.goal-complete {
+    background: #16a34a;
+}
+
 /* ---------- Dark mode ---------- */
 body.dark-mode {
     --bg: #111827;
@@ -1038,6 +1094,22 @@ body.dark-mode .weekly-recap-card {
     background: var(--card);
     color: var(--text);
     border-color: var(--border);
+}
+
+/* ---------- Goal progress dark mode ---------- */
+body.dark-mode .goal-progress {
+    background: var(--card);
+    color: var(--text);
+    border-color: var(--border);
+}
+
+body.dark-mode .goal-progress-row span:first-child,
+body.dark-mode .goal-progress-row span:last-child {
+    color: var(--text);
+}
+
+body.dark-mode .goal-progress-bar {
+    background: #374151;
 }
 
 /* ---------- Home page ---------- */
