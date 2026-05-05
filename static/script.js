@@ -513,7 +513,6 @@ async function renderPlot(graphContainer=null) {
     Plotly.newPlot(graphContainer, data, layout, config);
 
     let new_dld_btn = document.getElementById("download-graph");
-    // console.log(Plotly.toImage(graphContainer));
     new_dld_btn.onclick = () => Plotly.downloadImage(graphContainer, {filename: `nutri-daily-graph-${formatTrackerDateForApi(trackerSelectedDate)}`});
 }
 
@@ -527,8 +526,15 @@ async function sharePlot() {
     const recapImageDataUrl = await Plotly.toImage(graphContainer);
 
     console.dir(graphContainer.calcdata);
-    function getTotal(arr) {
-        //
+    function getTotal(arrIndex) {
+        let arr = graphContainer.calcdata[arrIndex].y;
+
+        if (arr === undefined) {
+            return 0;
+        }
+        else {
+            
+        }
     }
 
     let totalGained = graphContainer.calcdata[0]; totalGained = totalGained[totalGained.length];
