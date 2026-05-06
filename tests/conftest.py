@@ -29,6 +29,8 @@ def mock_database(monkeypatch):
     monkeypatch.setattr(main, "exercise_logs_collection", test_db["Exercise_logs"])
     monkeypatch.setattr(main, "exercise_logs_archive_collection", test_db["Exercise_logs_archive"])
     monkeypatch.setattr(main, "posts_collection", test_db["Posts"])
+    monkeypatch.setattr(main, "water_logs_collection", test_db["Water_logs"])
+    monkeypatch.setattr(main, "water_logs_archive_collection", test_db["Water_logs_archive"])
 
     main.settings.secret_key = "test-secret-key"
 

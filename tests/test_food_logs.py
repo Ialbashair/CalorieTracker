@@ -4,7 +4,8 @@ def test_add_food_log_success(client, auth_headers):
         json={
             "food_name": "Banana",
             "calories": 105,
-            "grams": 118,
+            "amount": 118,
+            "unit": "g",
             "log_date": "2026-04-30"
         },
         headers=auth_headers
@@ -15,8 +16,8 @@ def test_add_food_log_success(client, auth_headers):
     data = response.json()
     assert data["food_name"] == "Banana"
     assert data["calories"] == 105
-    assert data["grams"] == 118
-
+    assert data["amount"] == 118
+    assert data["unit"] == "g"
 
 def test_get_food_logs_by_date(client, auth_headers):
     client.post(
@@ -24,7 +25,8 @@ def test_get_food_logs_by_date(client, auth_headers):
         json={
             "food_name": "Banana",
             "calories": 105,
-            "grams": 118,
+            "amount": 118,
+            "unit": "g",
             "log_date": "2026-04-30"
         },
         headers=auth_headers
@@ -35,7 +37,8 @@ def test_get_food_logs_by_date(client, auth_headers):
         json={
             "food_name": "Apple",
             "calories": 95,
-            "grams": 150,
+            "amount": 150,
+            "unit": "g",
             "log_date": "2026-05-01"
         },
         headers=auth_headers
@@ -48,7 +51,7 @@ def test_get_food_logs_by_date(client, auth_headers):
     data = response.json()
     assert len(data) == 1
     assert data[0]["food_name"] == "Banana"
-
+    assert data[0]["amount"] == 118
 
 def test_food_logs_require_authentication(client):
     response = client.get("/food-logs")
