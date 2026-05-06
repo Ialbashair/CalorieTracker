@@ -908,6 +908,8 @@ function updateCalorieTotals() {
     if (inEl) inEl.textContent = caloriesIn;
     if (outEl) outEl.textContent = caloriesOut;
     if (totalEl) totalEl.textContent = netCalories;
+
+    updateAllGoalProgress();
 }
 
 async function loadUserGoals() {
@@ -2052,7 +2054,11 @@ function renderWaterList(logs) {
         listElement.appendChild(li);
     });
 
+    waterTotal = total;
+
     if (totalLabel) totalLabel.textContent = `(${total} mL)`;
+
+    updateAllGoalProgress();
 }
 
 function openAddWaterModal() {
@@ -3596,6 +3602,78 @@ async function submitPasswordChange() {
         }
     } catch (error) {
         console.error("Error updating password:", error);
+        messageEl.textContent = "Something went wrong.";
+        messageEl.style.color = "red";
+    }
+}
+
+async function submitGoalChange() {
+    const calorieInput = document.getElementById("settings-calorie-goal");
+    const exerciseInput = document.getElementById("settings-exercise-goal");
+    const waterInput = document.getElementById("settings-water-goal");
+    const messageEl = document.getElementById("settings-goals-message");
+
+    console.log("Goal save clicked");
+
+    if (!calorieInput || !exerciseInput || !waterInput || !messageEl) {
+        console.error("One or more goal input elements are missing.");
+        return;
+    }
+
+    const calorie_goal = parseInt(calorieInput.value, 10);
+    const exercise_goal = parseInt(exerciseInput.value, 10);
+    const water_goal_ml = parseInt(waterInput.value, 10);
+
+    console.log("Sending goals:", {
+        calorie_goal,
+        exercise_goal,
+        water_goal_ml
+    });
+
+    if (
+        isNaN(calorie_goal) || calorie_goal <= 0 ||
+        isNaN(exercise_goal) || exercise_goal <= 0 ||
+        isNaN(water_goal_ml) || water_goal_ml <= 0
+    ) {
+        messageEl.textContent = "Please enter valid goals greater than 0.";
+        messageEl.style.color = "red";
+        return;
+    }
+
+    try {
+        const response = await fetch("/settings/goals", {
+            method: "PUT",
+            headers: getAuthHeaders(),
+            body: JSON.stringify({
+                calorie_goal,
+                exercise_goal,
+                water_goal_ml
+            })
+        });
+
+        console.log("Goal update response status:", response.status);
+
+        if (response.status === 401) {
+            logoutUser();
+            return;
+        }
+
+        const data = await response.json().catch(() => ({}));
+        console.log("Goal update response data:", data);
+
+        if (response.ok) {
+            userGoals = data;
+            populateGoalSettingsInputs();
+            updateAllGoalProgress();
+
+            messageEl.textContent = "Goals updated successfully.";
+            messageEl.style.color = "green";
+        } else {
+            messageEl.textContent = data.detail || "Failed to update goals.";
+            messageEl.style.color = "red";
+        }
+    } catch (error) {
+        console.error("Error updating goals:", error);
         messageEl.textContent = "Something went wrong.";
         messageEl.style.color = "red";
     }

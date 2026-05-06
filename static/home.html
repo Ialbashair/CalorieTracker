@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -35,27 +36,60 @@
             </div>
         </section>
 
-        <section class="section">
-            <div class="section-header">
-                <h2>Today</h2>
-            </div>
+<section class="section">
+    <div class="section-header">
+        <h2>Today</h2>
+    </div>
 
-            <div class="home-stats-grid">
-                <div class="home-stat-card">
-                    <div class="home-stat-label">Calories Consumed Today</div>
-                    <div class="home-stat-value" id="home-calories-consumed">0</div>
-                </div>
+    <div class="home-stats-grid">
+        <div class="home-stat-card">
+            <div class="home-stat-label">Calories Consumed Today</div>
+            <div class="home-stat-value" id="home-calories-consumed">0</div>
+        </div>
 
-                <div class="home-stat-card">
-                    <div class="home-stat-label">Calories Burned Today</div>
-                    <div class="home-stat-value" id="home-calories-burned">0</div>
-                </div>
-                    <div class="home-stat-card">
-                        <div class="home-stat-label">Net Calories Today</div>
-                        <div class="home-stat-value" id="home-net-calories">0</div>
-                    </div>
+        <div class="home-stat-card">
+            <div class="home-stat-label">Calories Burned Today</div>
+            <div class="home-stat-value" id="home-calories-burned">0</div>
+        </div>
+
+        <div class="home-stat-card">
+            <div class="home-stat-label">Net Calories Today</div>
+            <div class="home-stat-value" id="home-net-calories">0</div>
+        </div>
+    </div>
+
+    <div class="home-goals-card">
+        <div class="goal-progress">
+            <div class="goal-progress-row">
+                <span>Daily calorie goal</span>
+                <span id="home-food-goal-label">0 / 2000 kcal</span>
             </div>
-        </section>
+            <div class="goal-progress-bar">
+                <div id="home-food-goal-fill" class="goal-progress-fill"></div>
+            </div>
+        </div>
+
+        <div class="goal-progress">
+            <div class="goal-progress-row">
+                <span>Daily exercise goal</span>
+                <span id="home-exercise-goal-label">0 / 500 kcal burned</span>
+            </div>
+            <div class="goal-progress-bar">
+                <div id="home-exercise-goal-fill" class="goal-progress-fill"></div>
+            </div>
+        </div>
+
+        <div class="goal-progress">
+            <div class="goal-progress-row">
+                <span>Daily water goal</span>
+                <span id="home-water-goal-label">0 / 2000 mL</span>
+            </div>
+            <div class="goal-progress-bar">
+                <div id="home-water-goal-fill" class="goal-progress-fill"></div>
+            </div>
+        </div>
+    </div>
+</section>
 
         <section class="section">
             <div class="home-member-since">
