@@ -47,6 +47,17 @@
                     <button class="add-section-btn" onclick="openAddFoodModal()">+ Add Food</button>
                 </div>
             </div>
+
+            <div class="goal-progress">
+                <div class="goal-progress-row">
+                    <span>Daily calorie goal</span>
+                    <span id="food-goal-label">0 / 2000 kcal</span>
+                </div>
+                <div class="goal-progress-bar">
+                    <div id="food-goal-fill" class="goal-progress-fill"></div>
+                </div>
+            </div>
+
             <p id="food-empty" class="empty-label">No foods logged yet. Add a food to get started!</p>
             <div id="calorie-list"></div>
         </section>
@@ -59,6 +70,17 @@
                     <button class="add-section-btn exercise-btn" onclick="openAddExerciseModal()">+ Add Exercise</button>
                 </div>
             </div>
+
+            <div class="goal-progress">
+                <div class="goal-progress-row">
+                    <span>Daily exercise goal</span>
+                    <span id="exercise-goal-label">0 / 500 kcal burned</span>
+                </div>
+                <div class="goal-progress-bar">
+                    <div id="exercise-goal-fill" class="goal-progress-fill"></div>
+                </div>
+            </div>
+
             <p id="exercise-empty" class="empty-label">No exercises logged yet. Add an exercise to get started!</p>
             <ul id="exercise-list"></ul>
         </section>
@@ -71,6 +93,17 @@
                     <button class="add-section-btn water-btn" onclick="openAddWaterModal()">+ Add Water</button>
                 </div>
             </div>
+
+            <div class="goal-progress">
+                <div class="goal-progress-row">
+                    <span>Daily water goal</span>
+                    <span id="water-goal-label">0 / 2000 mL</span>
+                </div>
+                <div class="goal-progress-bar">
+                    <div id="water-goal-fill" class="goal-progress-fill"></div>
+                </div>
+            </div>
+
             <p id="water-empty" class="empty-label">No water logged yet. Add a drink to get started!</p>
             <ul id="water-list"></ul>
         </section>
